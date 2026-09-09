@@ -32,26 +32,48 @@ def get_data(sheet_name):
     return pd.DataFrame()
 
 
-# 寫入資料函式
+# 寫入資料函式 (新增)
 def append_data(sheet_name, row_data):
-  if not WEB_APP_URL or "你的網址" in WEB_APP_URL:
-    st.error("請先在程式碼最上方填入正確的 Apps Script 網址！")
-    return False
   try:
-    payload = {"sheet": sheet_name, "data": row_data}
+    payload = {"sheet": sheet_name, "action": "append", "data": row_data}
     response = requests.post(WEB_APP_URL, json=payload)
     res_json = response.json()
-    if res_json.get("status") == "success":
-      return True
-    else:
-      st.error(f"寫入失敗: {res_json.get('message')}")
-      return False
+    return res_json.get("status") == "success"
   except Exception as e:
     st.error(f"連線失敗: {e}")
     return False
 
 
-# 自動生成依日期的流水編號 (當日日期 + 第幾筆)
+# 更新資料函式
+def update_data(sheet_name, record_id, row_data):
+  try:
+    payload = {
+        "sheet": sheet_name,
+        "action": "update",
+        "id": record_id,
+        "data": row_data,
+    }
+    response = requests.post(WEB_APP_URL, json=payload)
+    res_json = response.json()
+    return res_json.get("status") == "success"
+  except Exception as e:
+    st.error(f"更新失敗: {e}")
+    return False
+
+
+# 刪除資料函式
+def delete_data(sheet_name, record_id):
+  try:
+    payload = {"sheet": sheet_name, "action": "delete", "id": record_id}
+    response = requests.post(WEB_APP_URL, json=payload)
+    res_json = response.json()
+    return res_json.get("status") == "success"
+  except Exception as e:
+    st.error(f"刪除失敗: {e}")
+    return False
+
+
+# 自動生成流水編號
 def get_next_id(prefix, sheet_name):
   today_str = datetime.datetime.now().strftime("%m%d")
   df = get_data(sheet_name)
@@ -73,11 +95,11 @@ if not WEB_APP_URL or "你的網址" in WEB_APP_URL:
   st.warning("⚠️ 提醒：請確認雲端網址是否正確。")
 else:
   tab1, tab2, tab3 = st.tabs(
-      ["📦 1. 進貨與庫存", "💰 2. 訂單與帳務管理", "🖨️ 3. A4 卡片與傳統輓聯"]
+      ["📦 1. 進貨與庫存管理", "💰 2. 訂單與帳務管理", "🖨️ 3. A4 卡片與傳統輓聯"]
   )
 
   with tab1:
-    st.header("新增進貨 (批次與規格管理)")
+    st.header("新增進貨與庫存管理")
 
     category = st.selectbox("選擇進貨類別", ["蘭花", "陶瓷盆"])
 
@@ -98,23 +120,9 @@ else:
           cost = st.number_input("總進貨成本 (元)", min_value=0, value=800)
           date = st.date_input("進貨日期", datetime.date.today())
 
-        uploaded_file = st.file_uploader(
-            "📷 上傳蘭花照片 (支援 JPG, PNG)", type=["jpg", "jpeg", "png"]
-        )
-
-        image_info = ""
-        if uploaded_file is not None:
-          st.image(uploaded_file, caption="上傳照片預覽", width=250)
-          file_ext = uploaded_file.name.split(".")[-1]
-          image_filename = f"{item_id}_{datetime.datetime.now().strftime('%H%M%S')}.{file_ext}"
-          image_path = os.path.join("photos", image_filename)
-          with open(image_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-          image_info = image_path
-
         submitted = st.form_submit_button("確認新增蘭花進貨")
         if submitted:
-          spec_desc = f"規格:{spike_type} | 顏色:{color} | 大小:{size} | 高矮:{height} | 照片:{image_info if image_info else '無'}"
+          spec_desc = f"規格:{spike_type} | 顏色:{color} | 大小:{size} | 高矮:{height}"
           row = [
               item_id,
               "蘭花",
@@ -128,7 +136,7 @@ else:
             st.success("成功新增蘭花進貨紀錄！")
             st.rerun()
 
-    else:  # 陶瓷盆
+    else:
       with st.form("pot_form"):
         col1, col2 = st.columns(2)
         with col1:
@@ -136,7 +144,7 @@ else:
               "項目編號", value=get_next_id("POT", "進貨表")
           )
           pot_type = st.selectbox(
-              "盆器類型與成本",
+              "盆器類型",
               [
                   "桌上盆 (成本100)",
                   "落地盆-喪 (成本100)",
@@ -154,9 +162,7 @@ else:
             "落地盆-喜 (成本200)": 200,
             "羅馬盆 (成本280)": 280,
         }
-        unit_cost = cost_map[pot_type]
-        total_cost = unit_cost * int(qty)
-        st.info(f"💡 系統自動計算總成本：{total_cost} 元 ({unit_cost}元/個)")
+        total_cost = cost_map[pot_type] * int(qty)
 
         submitted_pot = st.form_submit_button("確認新增盆器進貨")
         if submitted_pot:
@@ -173,10 +179,28 @@ else:
             st.success("成功新增盆器進貨紀錄！")
             st.rerun()
 
-    st.subheader("現有進貨清單")
+    st.markdown("---")
+    st.subheader("📦 現有進貨清單 (修改與刪除)")
     df_inv = get_data("進貨表")
     if not df_inv.empty:
       st.dataframe(df_inv, use_container_width=True)
+
+      inv_ids = (
+          df_inv[df_inv.columns[0]].astype(str).tolist()
+          if len(df_inv.columns) > 0
+          else []
+      )
+      selected_inv_id = st.selectbox("選擇要管理的進貨項目編號", inv_ids)
+
+      col_del, col_edit = st.columns(2)
+      with col_del:
+        if st.button("🗑️ 刪除此筆進貨紀錄"):
+          if delete_data("進貨表", selected_inv_id):
+            st.success(f"已成功刪除進貨編號：{selected_inv_id}")
+            st.rerun()
+
+      with col_edit:
+        st.info("💡 如需修改，可直接刪除後重新新增正確資料。")
     else:
       st.info("目前尚無進貨資料。")
 
@@ -206,7 +230,6 @@ else:
         else:
           orchid_used = st.text_input("使用蘭花名稱")
 
-        # 批發客戶不需要選株數與盆器
         if cust_type == "批發":
           batch_qty = st.number_input("批發數量 (批)", min_value=1, value=1)
           pot_used = "批發免盆"
@@ -262,29 +285,49 @@ else:
           st.success("成功新增訂單紀錄！")
           st.rerun()
 
-    st.subheader("訂單與帳務總覽")
+    st.subheader("💰 訂單與帳務總覽 (狀態更新與刪除)")
     df_order = get_data("訂單表")
     if not df_order.empty:
       st.dataframe(df_order, use_container_width=True)
 
       st.markdown("---")
-      st.subheader("📝 訂單狀態快速更新 (選擇訂單編號即時修改)")
-      with st.form("update_status_form"):
-        order_ids_list = (
-            df_order["訂單編號"].tolist() if "訂單編號" in df_order.columns else []
-        )
-        selected_upd_id = st.selectbox(
-            "選擇要修改的訂單編號", order_ids_list
-        )
-        new_shipped = st.selectbox("更新出貨狀態", ["未出貨", "已出貨"])
-        new_payment = st.selectbox("更新付款狀態", ["未付款", "已付款"])
+      order_ids_list = (
+          df_order["訂單編號"].tolist() if "訂單編號" in df_order.columns else []
+      )
 
-        update_submitted = st.form_submit_button("確認更新該筆訂單狀態")
-        if update_submitted:
-          st.info(
-              f"💡 訂單 {selected_upd_id} 已更新狀態（出貨：{new_shipped} /"
-              f" 付款：{new_payment}）。請至 Google 試算表對應編號列進行確認或覆蓋。"
+      col_o1, col_o2 = st.columns(2)
+      with col_o1:
+        st.subheader("📝 更新訂單狀態")
+        with st.form("update_status_form"):
+          selected_upd_id = st.selectbox(
+              "選擇要修改的訂單編號", order_ids_list
           )
+          new_shipped = st.selectbox("更新出貨狀態", ["未出貨", "已出貨"])
+          new_payment = st.selectbox("更新付款狀態", ["未付款", "已付款"])
+          update_submitted = st.form_submit_button("確認更新狀態")
+
+          if update_submitted:
+            # 找到該筆訂單原本的資料並更新狀態欄位
+            matched_row = df_order[df_order["訂單編號"] == selected_upd_id]
+            if not matched_row.empty:
+              r_list = matched_row.values.tolist()[0]
+              r_list[-2] = new_shipped  # 倒數第二欄：出貨狀態
+              r_list[-1] = new_payment  # 最後一欄：付款狀態
+              if update_data("訂單表", selected_upd_id, r_list):
+                st.success(f"訂單 {selected_upd_id} 狀態已更新！")
+                st.rerun()
+
+      with col_o2:
+        st.subheader("🗑️ 刪除訂單")
+        with st.form("delete_order_form"):
+          selected_del_id = st.selectbox(
+              "選擇要刪除的訂單編號", order_ids_list, key="del_order_sel"
+          )
+          del_submitted = st.form_submit_button("確認刪除此訂單")
+          if del_submitted:
+            if delete_data("訂單表", selected_del_id):
+              st.success(f"已成功刪除訂單：{selected_del_id}")
+              st.rerun()
     else:
       st.info("目前尚無訂單資料。")
 
@@ -294,14 +337,17 @@ else:
     card_mode = st.selectbox("選擇卡片類型", ["喪禮傳統輓聯", "喜慶 / 開幕賀卡"])
 
     if card_mode == "喪禮傳統輓聯":
-      st.markdown("### 🕊️ 傳統輓聯設定 (支援直式與橫式)")
+      st.markdown("### 🕊️ 傳統輓聯設定 (直式 / 橫式)")
 
-      # 排版方向選擇
       orientation = st.radio(
-          "選擇列印排版方向", ["直式排版 (傳統直書)", "橫式排版 (上中下結構)"], horizontal=True
+          "選擇列印排版方向", ["直式排版 (傳統直書)", "橫式排版 (如圖片風格)"], horizontal=True
       )
 
-      # 字體大小調整控制區
+      card_style_bg = st.selectbox(
+          "卡片背景風格",
+          ["典雅紫藍暈染風 (如範例圖)", "簡約純白底色 (適合彩色列印機)"],
+      )
+
       with st.expander("⚙️ 調整字體大小設定", expanded=True):
         f_col1, f_col2, f_col3, f_col4 = st.columns(4)
         with f_col1:
@@ -323,16 +369,12 @@ else:
                 "自訂 / 手動輸入",
                 "敬悼 林媽莊老夫人仙逝",
                 "敬悼 林公春吉先生 千古",
+                "敬悼 臺北市政府",
                 "敬悼 X公X先生 仙逝",
-                "敬悼 X公X老先生 千古",
-                "敬悼 X媽X夫人 仙逝",
-                "敬悼 X媽X老夫人 千古",
             ],
         )
         if upper_preset == "自訂 / 手動輸入":
-          upper_text = st.text_input(
-              "輸入自訂上款", value="敬悼 林媽莊老夫人仙逝"
-          )
+          upper_text = st.text_input("輸入自訂上款", value="敬悼")
         else:
           upper_text = upper_preset
 
@@ -342,85 +384,30 @@ else:
             "逝者性別與年齡分類",
             [
                 "自訂 / 手動輸入",
-                "女 - 少女 / 年輕女性 (49歲以下)",
-                "女 - 中壯年女性 (50-79歲)",
-                "女 - 高齡女性 (80歲以上)",
-                "男 - 49歲以下 (年輕早逝)",
-                "男 - 50至69歲 (壯年至中老年)",
-                "男 - 70至79歲 (古稀)",
+                "上品上生",
+                "女 - 德高望重",
                 "男 - 80歲以上 (高壽期頤)",
             ],
         )
-
-        mid_options_dict = {
-            "女 - 少女 / 年輕女性 (49歲以下)": [
-                "遽促芳齡",
-                "玉殞香消",
-                "芳華早謝",
-                "蘭摧蕙折",
-                "妝台月冷",
-            ],
-            "女 - 中壯年女性 (50-79歲)": [
-                "淑德永昭",
-                "懿範長存",
-                "慈容永念",
-                "德業長昭",
-                "巾幗模範",
-            ],
-            "女 - 高齡女性 (80歲以上)": [
-                "萱範長存",
-                "母儀千古",
-                "駕返瑤池",
-                "萱蔭長留",
-                "壺範垂型",
-            ],
-            "男 - 49歲以下 (年輕早逝)": [
-                "星隕少微",
-                "玉樹長埋",
-                "壯志未酬",
-                "天不假年",
-                "長才未盡",
-                "玉折蘭摧",
-            ],
-            "男 - 50至69歲 (壯年至中老年)": [
-                "棟折梁摧",
-                "典則空留",
-                "英氣頓杳",
-                "德望昭然",
-                "風範長存",
-            ],
-            "男 - 70至79歲 (古稀)": [
-                "哲人其萎",
-                "斗柄西移",
-                "德業長昭",
-                "典范長存",
-            ],
-            "男 - 80歲以上 (高壽期頤)": [
-                "德高望重",
-                "魯般圮毀",
-                "仁者壽",
-                "德望永昭",
-            ],
-        }
-
-        if gender_choice in mid_options_dict:
-          mid_preset = st.selectbox(
-              "選擇經典輓辭", mid_options_dict[gender_choice]
-          )
-          mid_text = mid_preset
+        if gender_choice == "自訂 / 手動輸入":
+          mid_text = st.text_input("輸入自訂中款輓辭", value="上品上生")
         else:
-          mid_text = st.text_input("輸入自訂中款輓辭", value="懿德長昭")
+          mid_text = gender_choice
 
       with col_l:
         st.markdown("**【下款與敬輓設定】**")
-        sender_company = st.text_input("公司名稱", value="立成鋼鐵有限公司")
-        sender_name = st.text_input("姓名 / 落款", value="林春吉")
-        sender_extra = st.text_input("額外稱謂", value="暨全體同仁")
+        sender_company = st.text_input("公司名稱 / 機關", value="臺北市政府")
+        sender_name = st.text_input("姓名 / 落款", value="")
         kwan_text = st.text_input("敬輓字樣", value="敬輓")
 
       st.markdown("---")
 
-      # 根據選擇顯示直式或橫式預覽
+      bg_css = (
+          "background: linear-gradient(135deg, #e3e8f8 0%, #f3e6f8 100%);"
+          if "紫藍暈染" in card_style_bg
+          else "background: white;"
+      )
+
       if orientation == "直式排版 (傳統直書)":
         a4_html = f"""
                 <style>
@@ -430,7 +417,7 @@ else:
                     padding: 20mm 15mm;
                     margin: auto;
                     border: 2px dashed #bbb;
-                    background: white;
+                    {bg_css}
                     font-family: "DFKai-SB", "BiauKai", "標楷體", "KaiTi", serif;
                     display: flex;
                     justify-content: space-between;
@@ -439,40 +426,11 @@ else:
                     box-shadow: 0 0 15px rgba(0,0,0,0.1);
                     color: #000;
                 }}
-                .col-right {{
-                    writing-mode: vertical-rl;
-                    font-size: {sz_upper}px;
-                    letter-spacing: 4px;
-                    height: 90%;
-                    display: flex;
-                    align-items: flex-start;
-                }}
-                .col-center {{
-                    writing-mode: vertical-rl;
-                    font-size: {sz_mid}px;
-                    letter-spacing: 12px;
-                    height: 90%;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    font-weight: bold;
-                }}
-                .col-left-group {{
-                    height: 90%;
-                    display: flex;
-                    gap: 15px;
-                    align-items: flex-end;
-                }}
-                .col-kwan {{
-                    writing-mode: vertical-rl;
-                    font-size: {sz_kwan}px;
-                    letter-spacing: 4px;
-                }}
-                .col-lower {{
-                    writing-mode: vertical-rl;
-                    font-size: {sz_lower}px;
-                    letter-spacing: 4px;
-                }}
+                .col-right {{ writing-mode: vertical-rl; font-size: {sz_upper}px; letter-spacing: 4px; height: 90%; display: flex; align-items: flex-start; }}
+                .col-center {{ writing-mode: vertical-rl; font-size: {sz_mid}px; letter-spacing: 12px; height: 90%; display: flex; justify-content: center; align-items: center; font-weight: bold; }}
+                .col-left-group {{ height: 90%; display: flex; gap: 15px; align-items: flex-end; }}
+                .col-kwan {{ writing-mode: vertical-rl; font-size: {sz_kwan}px; letter-spacing: 4px; }}
+                .col-lower {{ writing-mode: vertical-rl; font-size: {sz_lower}px; letter-spacing: 4px; }}
                 @media print {{
                     body * {{ visibility: hidden; }}
                     .a4-page, .a4-page * {{ visibility: visible; }}
@@ -482,54 +440,45 @@ else:
                 <div class="a4-page">
                     <div class="col-left-group">
                         <div class="col-kwan"><span>{kwan_text}</span></div>
-                        <div class="col-lower"><span>{sender_extra}</span></div>
                         <div class="col-lower"><span>{sender_name}</span></div>
                         <div class="col-lower"><span>{sender_company}</span></div>
                     </div>
-                    <div class="col-center">
-                        <span>{mid_text}</span>
-                    </div>
-                    <div class="col-right">
-                        <span>{upper_text}</span>
-                    </div>
+                    <div class="col-center"><span>{mid_text}</span></div>
+                    <div class="col-right"><span>{upper_text}</span></div>
                 </div>
                 """
-      else:  # 橫式排版 (上 -> 中 -> 下)
+      else:  # 橫式排版 (如圖片風格：上中下，敬輓在名字下方)
         a4_html = f"""
                 <style>
                 .a4-page-h {{
                     width: 210mm;
                     height: 297mm;
-                    padding: 25mm 20mm;
+                    padding: 30mm 25mm;
                     margin: auto;
                     border: 2px dashed #bbb;
-                    background: white;
+                    {bg_css}
                     font-family: "DFKai-SB", "BiauKai", "標楷體", "KaiTi", serif;
                     display: flex;
                     flex-direction: column;
                     justify-content: space-between;
-                    align-items: center;
                     box-sizing: border-box;
                     box-shadow: 0 0 15px rgba(0,0,0,0.1);
                     color: #000;
-                    text-align: center;
                 }}
-                .row-upper {{
-                    font-size: {sz_upper}px;
-                    letter-spacing: 4px;
+                .row-upper {{ font-size: {sz_upper}px; letter-spacing: 4px; text-align: left; }}
+                .row-center {{ font-size: {sz_mid}px; font-weight: bold; letter-spacing: 12px; text-align: center; margin: auto 0; }}
+                .row-bottom-area {{
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-end;
                 }}
-                .row-center {{
-                    font-size: {sz_mid}px;
-                    font-weight: bold;
-                    letter-spacing: 8px;
-                }}
-                .row-lower {{
+                .row-lower-left {{ font-size: {sz_lower}px; letter-spacing: 4px; }}
+                .row-lower-right {{
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
                     font-size: {sz_lower}px;
                     letter-spacing: 4px;
-                    display: flex;
-                    gap: 15px;
-                    justify-content: center;
-                    align-items: center;
                 }}
                 @media print {{
                     body * {{ visibility: hidden; }}
@@ -540,11 +489,12 @@ else:
                 <div class="a4-page-h">
                     <div class="row-upper"><span>{upper_text}</span></div>
                     <div class="row-center"><span>{mid_text}</span></div>
-                    <div class="row-lower">
-                        <span>{sender_company}</span>
-                        <span>{sender_name}</span>
-                        <span>{sender_extra}</span>
-                        <span style="font-size: {sz_kwan}px;">{kwan_text}</span>
+                    <div class="row-bottom-area">
+                        <div class="row-lower-left"><span>{sender_company}</span></div>
+                        <div class="row-lower-right">
+                            <div style="font-size: {sz_lower}px; letter-spacing: 4px;">{sender_name}</div>
+                            <div style="font-size: {sz_kwan}px; letter-spacing: 4px; margin-top: 8px;">{kwan_text}</div>
+                        </div>
                     </div>
                 </div>
                 """
