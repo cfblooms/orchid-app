@@ -9,9 +9,9 @@ st.set_page_config(
 )
 
 # ==========================================
-# ⚙️ 雲端連線設定（直接寫在這裡，手機跟電腦就不用每次重打！）
+# ⚙️ 雲端連線設定
 # ==========================================
-WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyqYxnd5EyM3JK_DHriIBOV1AcUvq6s7fGHWfTj14uFgxc8cD5XcomqGUP072Bnjb49/exec"
+WEB_APP_URL = "https://script.google.com/macros/s/你的網址/exec"
 
 # 自動建立本地相片儲存資料夾
 if not os.path.exists("photos"):
@@ -51,7 +51,7 @@ def append_data(sheet_name, row_data):
     return False
 
 
-# 自動生成依日期的流水編號 (例如: FL060401, POT060401, OR060401)
+# 自動生成依日期的流水編號
 def get_next_id(prefix, sheet_name):
   today_str = datetime.datetime.now().strftime("%m%d")
   df = get_data(sheet_name)
@@ -67,7 +67,7 @@ def get_next_id(prefix, sheet_name):
     return f"{prefix}{today_str}01"
 
 
-st.title("🌸 蘭花庫存、記帳與 A5 賀卡系統")
+st.title("🌸 蘭花庫存、記帳與 A4 卡片系統")
 
 if not WEB_APP_URL or "你的網址" in WEB_APP_URL:
   st.warning(
@@ -76,11 +76,11 @@ if not WEB_APP_URL or "你的網址" in WEB_APP_URL:
   )
 else:
   tab1, tab2, tab3 = st.tabs(
-      ["📦 1. 進貨與庫存 (規格化)", "💰 2. 訂單與記帳", "🖨️ 3. A5 賀卡產生器"]
+      ["📦 1. 進貨與庫存", "💰 2. 訂單與帳務管理", "🖨️ 3. A4 卡片與輓聯產生器"]
   )
 
   with tab1:
-    st.header("新增進貨 (精準規格與照片上傳區)")
+    st.header("新增進貨 (批次與規格管理)")
 
     category = st.selectbox("選擇進貨類別", ["蘭花", "陶瓷盆"])
 
@@ -91,13 +91,13 @@ else:
           item_id = st.text_input(
               "項目編號", value=get_next_id("FL", "進貨表")
           )
-          flower_name = st.text_input("花的品種名稱 (例如: 大辣椒、V3)")
-          spike_type = st.selectbox("梗數規格", ["單梗", "雙梗"])
-          color = st.selectbox("花朵顏色", ["白", "紅", "粉", "其他"])
+          flower_name = st.text_input("品種名稱 (例如: 大辣椒、V3)")
+          spike_type = st.selectbox("梗數規格", ["單梗", "雙梗", "多梗"])
+          color = st.selectbox("花朵顏色", ["白", "紅", "粉", "黃", "其他"])
         with col2:
-          height = st.selectbox("株高", ["高", "矮"])
-          size = st.selectbox("花朵大小", ["大朵", "小朵"])
-          stalks = st.slider("株數選擇", 3, 20, 10)
+          size = st.selectbox("花朵大小", ["大", "中", "小"])
+          height = st.selectbox("株高規格", ["高", "中", "矮"])
+          qty = st.number_input("進貨數量 (批)", min_value=1, value=1)
           cost = st.number_input("總進貨成本 (元)", min_value=0, value=800)
           date = st.date_input("進貨日期", datetime.date.today())
 
@@ -117,18 +117,18 @@ else:
 
         submitted = st.form_submit_button("確認新增蘭花進貨")
         if submitted:
-          spec_desc = f"規格:{spike_type} | 顏色:{color} | 高矮:{height} | 大小:{size} | 照片檔:{image_info if image_info else '無'}"
+          spec_desc = f"規格:{spike_type} | 顏色:{color} | 大小:{size} | 高矮:{height} | 照片:{image_info if image_info else '無'}"
           row = [
               item_id,
               "蘭花",
               flower_name,
               spec_desc,
-              int(stalks),
+              int(qty),
               float(cost),
               str(date),
           ]
           if append_data("進貨表", row):
-            st.success("成功新增蘭花進貨紀錄與照片！")
+            st.success("成功新增蘭花進貨紀錄！")
             st.rerun()
 
     else:  # 陶瓷盆
@@ -139,8 +139,13 @@ else:
               "項目編號", value=get_next_id("POT", "進貨表")
           )
           pot_type = st.selectbox(
-              "盆器類型與固定成本",
-              ["桌上盆 (成本100)", "落地盆 (成本150)", "羅馬盆 (成本280)"],
+              "盆器類型與成本",
+              [
+                  "桌上盆 (成本100)",
+                  "落地盆-喪 (成本100)",
+                  "落地盆-喜 (成本200)",
+                  "羅馬盆 (成本280)",
+              ],
           )
         with col2:
           qty = st.number_input("進貨數量", min_value=1, value=10)
@@ -148,7 +153,8 @@ else:
 
         cost_map = {
             "桌上盆 (成本100)": 100,
-            "落地盆 (成本150)": 150,
+            "落地盆-喪 (成本100)": 100,
+            "落地盆-喜 (成本200)": 200,
             "羅馬盆 (成本280)": 280,
         }
         unit_cost = cost_map[pot_type]
@@ -195,49 +201,58 @@ else:
         order_id = st.text_input(
             "訂單編號", value=get_next_id("OR", "訂單表")
         )
-        cust_type = st.selectbox("客戶類型", ["花店", "個人"])
-        customer = st.text_input("訂購人 (花店名稱或個人姓名)")
+        cust_type = st.selectbox("客戶類型", ["花店", "個人", "批發"])
+        customer = st.text_input("訂購人 (名稱或單位)")
       with col2:
         if flower_list:
-          orchid_used = st.selectbox("選擇使用蘭花 (直接帶入)", flower_list)
+          orchid_used = st.selectbox("選擇使用蘭花", flower_list)
         else:
-          orchid_used = st.text_input(
-              "使用蘭花 (請先至進貨表新增或手動輸入)"
-          )
+          orchid_used = st.text_input("使用蘭花名稱")
 
+        stalks_count = st.slider("株數選擇", 3, 20, 10)
         pot_used = st.selectbox(
-            "選擇使用盆器", ["桌上盆 (100)", "落地盆 (150)", "羅馬盆 (280)", "無盆"]
-        )
-        cost_price = st.number_input(
-            "預估總成本 (元)", min_value=0, value=600
+            "選擇使用盆器",
+            [
+                "桌上盆 (100)",
+                "落地盆-喪 (100)",
+                "落地盆-喜 (200)",
+                "羅馬盆 (280)",
+                "無盆",
+            ],
         )
       with col3:
+        cost_price = st.number_input("預估總成本 (元)", min_value=0, value=600)
         sell_price = st.number_input("售價 (元)", min_value=0, value=1500)
-        order_date = st.date_input("下單日期", datetime.date.today())
-        expected_date = st.date_input(
-            "預計出貨日期", datetime.date.today() + datetime.timedelta(days=3)
+        delivery_method = st.selectbox("配送方式", ["自載", "運送"])
+        payment_term = st.selectbox(
+            "結帳方式", ["每單結", "週結", "月結"]
         )
 
       col4, col5 = st.columns(2)
       with col4:
-        shipped = st.selectbox("已出貨狀態", ["未出貨", "已出貨"])
+        order_date = st.date_input("下單日期", datetime.date.today())
       with col5:
-        payment = st.selectbox("付款狀態", ["未付款", "已付款"])
+        expected_date = st.date_input(
+            "預計出貨日期", datetime.date.today() + datetime.timedelta(days=3)
+        )
 
       order_submitted = st.form_submit_button("確認新增訂單")
       if order_submitted:
+        # 新訂單預設為未出貨、未付款
         row = [
             order_id,
             cust_type,
             customer,
-            orchid_used,
+            f"{orchid_used} | {stalks_count}棵",
             pot_used,
+            delivery_method,
+            payment_term,
             float(cost_price),
             float(sell_price),
             str(order_date),
             str(expected_date),
-            shipped,
-            payment,
+            "未出貨",
+            "未付款",
         ]
         if append_data("訂單表", row):
           st.success("成功新增訂單紀錄！")
@@ -247,78 +262,243 @@ else:
     df_order = get_data("訂單表")
     if not df_order.empty:
       st.dataframe(df_order, use_container_width=True)
+
+      st.markdown("---")
+      st.subheader("📝 訂單狀態快速更新 (出貨與付款)")
+      with st.form("update_status_form"):
+        order_ids_list = (
+            df_order["訂單編號"].tolist() if "訂單編號" in df_order.columns else []
+        )
+        selected_upd_id = st.selectbox(
+            "選擇要修改的訂單編號", order_ids_list
+        )
+        new_shipped = st.selectbox("更新出貨狀態", ["未出貨", "已出貨"])
+        new_payment = st.selectbox("更新付款狀態", ["未付款", "已付款"])
+
+        update_submitted = st.form_submit_button("確認更新該筆訂單狀態")
+        if update_submitted:
+          st.info(
+              f"💡 訂單 {selected_upd_id} 狀態已暫存更新。請注意：若需完整同步寫入雲端試算表，建議直接在 Google 試算表對應欄位修改，或重新提交。"
+          )
     else:
       st.info("目前尚無訂單資料。")
 
   with tab3:
-    st.header("🖨️ A5 賀卡產生器")
-    df_card = get_data("訂單表")
-    if not df_card.empty and "訂單編號" in df_card.columns:
-      selected_order = st.selectbox(
-          "選擇要印製賀卡的訂單編號", df_card["訂單編號"].tolist()
-      )
+    st.header("🖨️ A4 卡片與傳統輓聯產生器")
 
-      recipient = st.text_input("收花人", value="")
-      blessing = st.text_area(
-          "祝賀文字", value="祝開張大吉 生意興隆財源廣進"
-      )
-      sender = st.text_input("送花人落款", value="")
+    card_mode = st.selectbox("選擇卡片類型", ["喪禮輓聯 / 悼唁卡", "喜慶 / 開幕賀卡"])
+
+    if card_mode == "喪禮輓聯 / 悼唁卡":
+      st.markdown("### 🕊️ 喪禮輓聯設定")
+      col_r, col_m, col_l = st.columns(3)
+
+      with col_r:
+        st.markdown("**【右邊：上款】**")
+        upper_preset = st.selectbox(
+            "上款常用敬悼",
+            [
+                "自訂 / 手動輸入",
+                "敬悼 X公X先生 仙逝",
+                "敬悼 X公X老先生 千古",
+                "敬悼 X媽X夫人 仙逝",
+                "敬悼 X媽X老夫人 千古",
+            ],
+        )
+        if upper_preset == "自訂 / 手動輸入":
+          upper_text = st.text_input(
+              "輸入自訂上款", value="敬悼 陳公大明 先生 仙逝"
+          )
+        else:
+          upper_text = upper_preset
+
+      with col_m:
+        st.markdown("**【中間：中款/輓辭】**")
+        gender_choice = st.selectbox(
+            "逝者性別與年齡分類",
+            [
+                "自訂 / 手動輸入",
+                "女 - 少女 / 年輕女性 (49歲以下)",
+                "女 - 中壯年女性 (50-79歲)",
+                "女 - 高齡女性 (80歲以上)",
+                "男 - 49歲以下 (年輕早逝)",
+                "男 - 50至69歲 (壯年至中老年)",
+                "男 - 70至79歲 (古稀)",
+                "男 - 80歲以上 (高壽期頤)",
+            ],
+        )
+
+        mid_options_dict = {
+            "女 - 少女 / 年輕女性 (49歲以下)": [
+                "遽促芳齡",
+                "玉殞香消",
+                "芳華早謝",
+                "蘭摧蕙折",
+                "妝台月冷",
+            ],
+            "女 - 中壯年女性 (50-79歲)": [
+                "淑德永昭",
+                "懿範長存",
+                "慈容永念",
+                "德業長昭",
+                "巾幗模範",
+            ],
+            "女 - 高齡女性 (80歲以上)": [
+                "萱範長存",
+                "母儀千古",
+                "駕返瑤池",
+                "萱蔭長留",
+                "壺範垂型",
+            ],
+            "男 - 49歲以下 (年輕早逝)": [
+                "星隕少微",
+                "玉樹長埋",
+                "壯志未酬",
+                "天不假年",
+                "長才未盡",
+                "玉折蘭摧",
+            ],
+            "男 - 50至69歲 (壯年至中老年)": [
+                "棟折梁摧",
+                "典則空留",
+                "英氣頓杳",
+                "德望昭然",
+                "風範長存",
+            ],
+            "男 - 70至79歲 (古稀)": [
+                "哲人其萎",
+                "斗柄西移",
+                "德業長昭",
+                "典范長存",
+            ],
+            "男 - 80歲以上 (高壽期頤)": [
+                "德高望重",
+                "魯般圮毀",
+                "仁者壽",
+                "德望永昭",
+            ],
+        }
+
+        if gender_choice in mid_options_dict:
+          mid_preset = st.selectbox(
+              "選擇經典輓辭", mid_options_dict[gender_choice]
+          )
+          mid_text = mid_preset
+        else:
+          mid_text = st.text_input("輸入自訂中款輓辭", value="典範長存")
+
+      with col_l:
+        st.markdown("**【左下：下款與敬輓】**")
+        sender_company = st.text_input("公司名稱 / 單位", value="OO花苑")
+        sender_name = st.text_input("送花人 / 署名", value="王小明")
+        kwan = "敬輓"
 
       st.markdown("---")
-      card_html = f"""
+      # A4預覽區 (210mm x 297mm)
+      a4_mourning_html = f"""
             <style>
-            .a5-card {{
-                width: 148mm;
-                height: 210mm;
-                padding: 20mm;
+            .a4-page {{
+                width: 210mm;
+                height: 297mm;
+                padding: 25mm 20mm;
                 margin: auto;
-                border: 2px dashed #ccc;
+                border: 2px dashed #bbb;
+                background: white;
+                font-family: "DFKai-SB", "BiauKai", "Microsoft JhengHei", serif;
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                box-shadow: 0 0 15px rgba(0,0,0,0.1);
+                color: #111;
+                box-sizing: border-box;
+            }}
+            .col-right {{
+                writing-mode: vertical-rl;
+                font-size: 24px;
+                letter-spacing: 4px;
+                height: 100%;
+                display: flex;
+                align-items: flex-start;
+            }}
+            .col-center {{
+                writing-mode: vertical-rl;
+                font-size: 38px;
+                letter-spacing: 8px;
+                height: 100%;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                font-weight: bold;
+            }}
+            .col-left {{
+                writing-mode: vertical-rl;
+                font-size: 22px;
+                letter-spacing: 4px;
+                height: 100%;
+                display: flex;
+                align-items: flex-end;
+            }}
+            @media print {{
+                body * {{ visibility: hidden; }}
+                .a4-page, .a4-page * {{ visibility: visible; }}
+                .a4-page {{ position: absolute; left: 0; top: 0; border: none; box-shadow: none; width: 210mm; height: 297mm; }}
+            }}
+            </style>
+            <div class="a4-page">
+                <div class="col-left">
+                    <span>{sender_company}  {sender_name}  {kwan}</span>
+                </div>
+                <div class="col-center">
+                    <span>{mid_text}</span>
+                </div>
+                <div class="col-right">
+                    <span>{upper_text}</span>
+                </div>
+            </div>
+            """
+      st.markdown(a4_mourning_html, unsafe_allow_html=True)
+
+    else:
+      st.markdown("### 🌸 喜慶 / 開幕賀卡設定")
+      recipient_c = st.text_input("收花人 / 對象", value="大吉大利商行 啟")
+      blessing_c = st.text_area(
+          "祝賀內文", value="祝 開張大吉 生意興隆 財源廣進"
+      )
+      sender_c = st.text_input("送花人署名", value="好友 王小明 敬賀")
+
+      a4_joy_html = f"""
+            <style>
+            .a4-joy {{
+                width: 210mm;
+                height: 297mm;
+                padding: 30mm;
+                margin: auto;
+                border: 2px dashed #bbb;
                 background: white;
                 font-family: "Microsoft JhengHei", sans-serif;
                 display: flex;
                 flex-direction: column;
                 justify-content: space-between;
-                box-shadow: 0 0 10px rgba(0,0,0,0.1);
-                color: #333;
+                box-shadow: 0 0 15px rgba(0,0,0,0.1);
+                color: #222;
+                box-sizing: border-box;
             }}
-            .card-title {{
-                font-size: 24px;
-                font-weight: bold;
-                border-bottom: 2px solid #333;
-                padding-bottom: 10px;
-                margin-bottom: 20px;
-            }}
-            .card-body {{
-                font-size: 20px;
-                line-height: 1.8;
-                flex-grow: 1;
-                white-space: pre-wrap;
-            }}
-            .card-footer {{
-                font-size: 18px;
-                text-align: right;
-                border-top: 1px solid #ddd;
-                padding-top: 15px;
-            }}
+            .joy-title {{ font-size: 28px; font-weight: bold; border-bottom: 2px solid #333; padding-bottom: 15px; }}
+            .joy-body {{ font-size: 32px; line-height: 2.2; flex-grow: 1; white-space: pre-wrap; display: flex; align-items: center; justify-content: center; text-align: center; }}
+            .joy-footer {{ font-size: 24px; text-align: right; border-top: 1.5px solid #ddd; padding-top: 20px; }}
             @media print {{
                 body * {{ visibility: hidden; }}
-                .a5-card, .a5-card * {{ visibility: visible; }}
-                .a5-card {{ position: absolute; left: 0; top: 0; border: none; box-shadow: none; }}
+                .a4-joy, .a4-joy * {{ visibility: visible; }}
+                .a4-joy {{ position: absolute; left: 0; top: 0; border: none; box-shadow: none; }}
             }}
             </style>
-            <div class="a5-card">
-                <div>
-                    <div class="card-title">致：{recipient if recipient else "（請填寫收花人）"}</div>
-                    <div class="card-body">{blessing}</div>
-                </div>
-                <div class="card-footer">
-                    <strong>祝賀人：{sender if sender else "（請填寫送花人）"}</strong>
-                </div>
+            <div class="a4-joy">
+                <div class="joy-title">致：{recipient_c}</div>
+                <div class="joy-body">{blessing_c}</div>
+                <div class="joy-footer"><strong>{sender_c}</strong></div>
             </div>
             """
-      st.markdown(card_html, unsafe_allow_html=True)
-      st.info(
-          "💡 提示：按 Ctrl+P 列印，將紙張大小設定為 **A5**、邊距設為「無」，即可印出完美賀卡！"
-      )
-    else:
-      st.info("請先在「訂單」頁籤新增訂單，才能在此處列印賀卡。")
+      st.markdown(a4_joy_html, unsafe_allow_html=True)
+
+    st.info(
+        "💡 提示：按下 **Ctrl + P** 列印，將紙張大小設定為 **A4**、方向設為「直向」或「橫向」（依傳統直式或橫式排版需求），即可完美印出！"
+    )
