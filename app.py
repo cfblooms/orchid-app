@@ -100,7 +100,7 @@ else:
           "📦 2. 進貨與庫存管理",
           "🔄 3. 退貨管理區",
           "💰 4. 訂單與帳務管理",
-          "🖨️ 5. A4 橫式輓聯與卡片",
+          "🖨️ 5. A4 輓聯與卡片",
       ]
   )
 
@@ -142,8 +142,6 @@ else:
     df_db = get_data("蘭花資料庫")
     if not df_db.empty:
       st.dataframe(df_db, use_container_width=True)
-
-      # 顯示圖片預覽
       for index, row in df_db.iterrows():
         cols = st.columns([1, 3])
         with cols[0]:
@@ -161,7 +159,7 @@ else:
       st.info("目前資料庫尚無品種資料。")
 
   # -----------------------------------------
-  # TAB 2: 進貨與庫存管理
+  # TAB 2: 進貨與庫存管理 (含照片預覽)
   # -----------------------------------------
   with tab2:
     st.header("📦 新增進貨與庫存管理")
@@ -257,10 +255,37 @@ else:
             st.rerun()
 
     st.markdown("---")
-    st.subheader("📦 現有進貨清單與管理")
+    st.subheader("📦 現有進貨清單與照片預覽")
     df_inv = get_data("進貨表")
     if not df_inv.empty:
       st.dataframe(df_inv, use_container_width=True)
+
+      # 建立資料庫名稱到照片的對應字典
+      photo_lookup = {}
+      if not df_db.empty and "品種名稱" in df_db.columns and "相片路徑" in df_db.columns:
+        for _, r in df_db.iterrows():
+          photo_lookup[str(r["品種名稱"])] = r["相片路徑"]
+
+      st.markdown("#### 🖼️ 各進貨品項對應照片檢視")
+      for _, row in df_inv.iterrows():
+        item_n = row.get("品項名稱/品種", "")
+        # 尋找是否有對應的照片
+        img_path = photo_lookup.get(str(item_n), "")
+        c1, c2 = st.columns([1, 4])
+        with c1:
+          if img_path and os.path.exists(img_path):
+            st.image(img_path, width=100)
+          else:
+            st.caption("無對應資料庫照片")
+        with c2:
+          st.write(
+              f"**編號**: {row.get('項目編號', '')} | **類別**: {row.get('類別', '')} | **品種**: {item_n}"
+          )
+          st.write(
+              f"**數量**: {row.get('數量', '')} | **成本**: {row.get('總成本/金額', '')} | **日期**: {row.get('進貨日期', '')}"
+          )
+        st.divider()
+
       inv_ids = df_inv[df_inv.columns[0]].astype(str).tolist()
       selected_inv_id = st.selectbox("選擇要刪除的進貨項目編號", inv_ids, key="del_inv")
       if st.button("🗑️ 刪除此筆進貨紀錄"):
@@ -271,13 +296,12 @@ else:
       st.info("目前尚無進貨資料。")
 
   # -----------------------------------------
-  # TAB 3: 退貨管理區
+  # TAB 3: 退貨管理區 (細分退貨類型與對象)
   # -----------------------------------------
   with tab3:
     st.header("🔄 退貨與不良品管理區")
     st.markdown(
-        "可處理**進貨不良退貨（向花農退貨）**或**批發客戶退貨**，皆以【棵數 ×"
-        " 每棵單價】計算總退款金額。"
+        "可清楚區分【我們向花農退貨】或【批發商向我們退貨】，並記錄退貨對象與計算總金額。"
     )
 
     df_inv_chk = get_data("進貨表")
@@ -296,18 +320,21 @@ else:
       with col_r1:
         ret_id = st.text_input("退貨編號", value=get_next_id("RET", "退貨表"))
         ret_type = st.selectbox(
-            "退貨類型",
+            "退貨類型選擇",
             [
-                "進貨不良退貨 (向花農退貨)",
-                "批發客戶退貨 (客戶退回批發批次)",
+                "1. 我們向花農退貨 (退給供應商)",
+                "2. 批發商向我們退貨 (客戶退回)",
             ],
         )
+        party_name = st.text_input(
+            "填寫對象名稱 (花農名稱 或 批發客戶名稱)", value="某某花農 / 某某花店"
+        )
+      with col_r2:
         target_item = st.selectbox(
             "關聯進貨批次/品項",
             inv_items_list if inv_items_list else ["無可用項目"],
         )
-      with col_r2:
-        bad_qty = st.number_input("不良/退貨株數 (棵)", min_value=1, value=2)
+        bad_qty = st.number_input("退貨/不良株數 (棵)", min_value=1, value=2)
         unit_price = st.number_input(
             "每棵單價 / 成本 (元)", min_value=0.0, value=150.0
         )
@@ -316,7 +343,7 @@ else:
 
       total_return_amount = float(bad_qty) * float(unit_price)
       st.info(
-          f"💡 系統計算總退貨金額：**{total_return_amount} 元** ({bad_qty}棵 ×"
+          f"💡 系統計算總金額：**{total_return_amount} 元** ({bad_qty}棵 ×"
           f" {unit_price}元)"
       )
 
@@ -325,6 +352,7 @@ else:
         row_ret = [
             ret_id,
             ret_type,
+            party_name,
             target_item,
             int(bad_qty),
             float(unit_price),
@@ -486,17 +514,21 @@ else:
       st.info("目前尚無訂單資料。")
 
   # -----------------------------------------
-  # TAB 5: A4 橫式輓聯與卡片
+  # TAB 5: A4 橫式與直式輓聯產生器
   # -----------------------------------------
   with tab5:
-    st.header("🖨️ A4 橫式輓聯與卡片產生器 (標楷體)")
+    st.header("🖨️ A4 輓聯與卡片產生器 (支援橫式與直式)")
     st.markdown(
-        "【敬輓】已嚴格設定在【名字正下方】垂直堆疊。你可以透過下方拉桿任意調整各區塊文字大小。"
+        "你可以自由選擇 **A4 橫式排版**（敬輓固定在名字正下方）或 **A4 直式排版**。"
     )
 
     card_mode = st.selectbox("選擇卡片類型", ["喪禮傳統輓聯", "喜慶 / 開幕賀卡"])
 
     if card_mode == "喪禮傳統輓聯":
+      orientation = st.radio(
+          "選擇輓聯列印方向", ["A4 橫式排版", "A4 直式排版"], horizontal=True
+      )
+
       card_style_bg = st.selectbox(
           "卡片背景風格",
           ["典雅紫藍暈染風 (如範例圖)", "簡約純白底色"],
@@ -514,23 +546,16 @@ else:
           sz_kwan = st.slider("敬輓字體大小", 30, 100, 45)
 
       col_r, col_m, col_l = st.columns(3)
-
       with col_r:
         st.markdown("**【上款設定】**")
         upper_text = st.text_input("輸入上款 (如: 敬悼)", value="敬悼")
-
       with col_m:
         st.markdown("**【中款 / 輓辭設定】**")
         mid_text = st.text_input("輸入中款輓辭 (如: 上品上生)", value="上品上生")
-
       with col_l:
         st.markdown("**【下款與敬輓設定】**")
-        sender_company = st.text_input(
-            "左下機關/公司 (例如: 臺北市政府)", value="臺北市政府"
-        )
-        sender_name = st.text_input(
-            "右下落款名字 (例如: 王大明)", value="王大明"
-        )
+        sender_company = st.text_input("左下機關/公司", value="臺北市政府")
+        sender_name = st.text_input("右下落款名字", value="王大明")
         kwan_text = st.text_input("敬輓字樣", value="敬輓")
 
       st.markdown("---")
@@ -541,60 +566,100 @@ else:
           else "background: white;"
       )
 
-      # A4 橫向：寬 297mm，高 210mm
-      a4_landscape_html = f"""
-            <style>
-            .a4-landscape {{
-                width: 297mm;
-                height: 210mm;
-                padding: 20mm 25mm;
-                margin: auto;
-                border: 2px dashed #bbb;
-                {bg_css}
-                font-family: "DFKai-SB", "BiauKai", "標楷體", "KaiTi", serif;
-                display: flex;
-                flex-direction: column;
-                justify-content: space-between;
-                box-sizing: border-box;
-                box-shadow: 0 0 15px rgba(0,0,0,0.1);
-                color: #000;
-            }}
-            .row-upper {{ font-size: {sz_upper}px; letter-spacing: 4px; text-align: left; }}
-            .row-center {{ font-size: {sz_mid}px; font-weight: bold; letter-spacing: 16px; text-align: center; margin: auto 0; }}
-            .row-bottom-area {{
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-end;
-            }}
-            .row-lower-left {{ font-size: {sz_lower}px; letter-spacing: 4px; }}
-            .row-lower-right {{
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                font-size: {sz_lower}px;
-                letter-spacing: 4px;
-            }}
-            @media print {{
-                @page {{ size: A4 landscape; }}
-                body * {{ visibility: hidden; }}
-                .a4-landscape, .a4-landscape * {{ visibility: visible; }}
-                .a4-landscape {{ position: absolute; left: 0; top: 0; border: none; box-shadow: none; width: 297mm; height: 210mm; }}
-            }}
-            </style>
-            <div class="a4-landscape">
-                <div class="row-upper"><span>{upper_text}</span></div>
-                <div class="row-center"><span>{mid_text}</span></div>
-                <div class="row-bottom-area">
-                    <div class="row-lower-left"><span>{sender_company}</span></div>
-                    <div class="row-lower-right">
-                        <div>{sender_name}</div>
-                        <div style="font-size: {sz_kwan}px; margin-top: 6px;">{kwan_text}</div>
+      if orientation == "A4 橫式排版":
+        a4_html = f"""
+                <style>
+                .a4-landscape {{
+                    width: 297mm;
+                    height: 210mm;
+                    padding: 20mm 25mm;
+                    margin: auto;
+                    border: 2px dashed #bbb;
+                    {bg_css}
+                    font-family: "DFKai-SB", "BiauKai", "標楷體", "KaiTi", serif;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+                    box-sizing: border-box;
+                    box-shadow: 0 0 15px rgba(0,0,0,0.1);
+                    color: #000;
+                }}
+                .row-upper {{ font-size: {sz_upper}px; letter-spacing: 4px; text-align: left; }}
+                .row-center {{ font-size: {sz_mid}px; font-weight: bold; letter-spacing: 16px; text-align: center; margin: auto 0; }}
+                .row-bottom-area {{
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-end;
+                }}
+                .row-lower-left {{ font-size: {sz_lower}px; letter-spacing: 4px; }}
+                .row-lower-right {{
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    font-size: {sz_lower}px;
+                    letter-spacing: 4px;
+                }}
+                @media print {{
+                    @page {{ size: A4 landscape; }}
+                    body * {{ visibility: hidden; }}
+                    .a4-landscape, .a4-landscape * {{ visibility: visible; }}
+                    .a4-landscape {{ position: absolute; left: 0; top: 0; border: none; box-shadow: none; width: 297mm; height: 210mm; }}
+                }}
+                </style>
+                <div class="a4-landscape">
+                    <div class="row-upper"><span>{upper_text}</span></div>
+                    <div class="row-center"><span>{mid_text}</span></div>
+                    <div class="row-bottom-area">
+                        <div class="row-lower-left"><span>{sender_company}</span></div>
+                        <div class="row-lower-right">
+                            <div>{sender_name}</div>
+                            <div style="font-size: {sz_kwan}px; margin-top: 6px;">{kwan_text}</div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            """
+                """
+      else:
+        a4_html = f"""
+                <style>
+                .a4-portrait {{
+                    width: 210mm;
+                    height: 297mm;
+                    padding: 20mm 15mm;
+                    margin: auto;
+                    border: 2px dashed #bbb;
+                    {bg_css}
+                    font-family: "DFKai-SB", "BiauKai", "標楷體", "KaiTi", serif;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    box-sizing: border-box;
+                    box-shadow: 0 0 15px rgba(0,0,0,0.1);
+                    color: #000;
+                }}
+                .col-right {{ writing-mode: vertical-rl; font-size: {sz_upper}px; letter-spacing: 4px; height: 90%; display: flex; align-items: flex-start; }}
+                .col-center {{ writing-mode: vertical-rl; font-size: {sz_mid}px; letter-spacing: 12px; height: 90%; display: flex; justify-content: center; align-items: center; font-weight: bold; }}
+                .col-left-group {{ height: 90%; display: flex; gap: 15px; align-items: flex-end; }}
+                .col-kwan {{ writing-mode: vertical-rl; font-size: {sz_kwan}px; letter-spacing: 4px; }}
+                .col-lower {{ writing-mode: vertical-rl; font-size: {sz_lower}px; letter-spacing: 4px; }}
+                @media print {{
+                    @page {{ size: A4 portrait; }}
+                    body * {{ visibility: hidden; }}
+                    .a4-portrait, .a4-portrait * {{ visibility: visible; }}
+                    .a4-portrait {{ position: absolute; left: 0; top: 0; border: none; box-shadow: none; width: 210mm; height: 297mm; }}
+                }}
+                </style>
+                <div class="a4-portrait">
+                    <div class="col-left-group">
+                        <div class="col-kwan"><span>{kwan_text}</span></div>
+                        <div class="col-lower"><span>{sender_name}</span></div>
+                        <div class="col-lower"><span>{sender_company}</span></div>
+                    </div>
+                    <div class="col-center"><span>{mid_text}</span></div>
+                    <div class="col-right"><span>{upper_text}</span></div>
+                </div>
+                """
 
-      st.markdown(a4_landscape_html, unsafe_allow_html=True)
+      st.markdown(a4_html, unsafe_allow_html=True)
 
     else:
       st.markdown("### 🌸 喜慶 / 開幕賀卡設定")
@@ -638,5 +703,5 @@ else:
       st.markdown(a4_joy_html, unsafe_allow_html=True)
 
     st.info(
-        "💡 列印提示：按下 **Ctrl + P**，印表機紙張方向請選擇「**橫向 (Landscape)**」，即可完美列印出 A4 橫式輓聯！"
+        "💡 列印提示：按下 **Ctrl + P**，印表機的紙張方向請選擇對應的**橫向 (Landscape)** 或**直向 (Portrait)** 即可！"
     )
