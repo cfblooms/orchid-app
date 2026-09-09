@@ -94,18 +94,19 @@ st.title("🌸 蘭花庫存、記帳與 A4 卡片系統")
 if not WEB_APP_URL or "你的網址" in WEB_APP_URL:
   st.warning("⚠️ 提醒：請確認雲端網址是否正確。")
 else:
-  tab1, tab2, tab3, tab4, tab5 = st.tabs(
+  tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
       [
           "🌸 1. 蘭花品種資料庫",
-          "📦 2. 進貨與庫存管理",
-          "🔄 3. 退貨管理區",
-          "💰 4. 訂單與帳務管理",
-          "🖨️ 5. A4 輓聯與卡片",
+          "👥 2. 客戶資料庫",
+          "📦 3. 進貨與庫存管理",
+          "🔄 4. 退貨管理區",
+          "💰 5. 訂單與帳務管理",
+          "🖨️ 6. A4 輓聯與卡片",
       ]
   )
 
   # -----------------------------------------
-  # TAB 1: 蘭花資料庫
+  # TAB 1: 蘭花品種資料庫
   # -----------------------------------------
   with tab1:
     st.header("🌸 蘭花品種寫入與資料庫管理")
@@ -159,9 +160,50 @@ else:
       st.info("目前資料庫尚無品種資料。")
 
   # -----------------------------------------
-  # TAB 2: 進貨與庫存管理 (含照片預覽)
+  # TAB 2: 客戶資料庫 (新增)
   # -----------------------------------------
   with tab2:
+    st.header("👥 客戶資料庫管理 (批發商與花店)")
+    st.markdown(
+        "在此建立批發商與花店的客戶資料，方便後續訂單與退貨管理直接點選。"
+    )
+
+    with st.form("cust_form"):
+      c_col1, c_col2 = st.columns(2)
+      with c_col1:
+        cust_id = st.text_input("客戶編號", value=get_next_id("CUST", "客戶資料庫"))
+        cust_name = st.text_input("客戶 / 店鋪名稱 (例如: 大吉花店、宏達批發)")
+      with c_col2:
+        cust_type = st.selectbox("客戶類別", ["批發商", "花店", "其他"])
+        cust_phone = st.text_input("聯絡電話 / 備註", value="0912-345678")
+
+      cust_submitted = st.form_submit_button("儲存客戶資料")
+      if cust_submitted:
+        row_cust = [cust_id, cust_name, cust_type, cust_phone]
+        if append_data("客戶資料庫", row_cust):
+          st.success(f"成功新增客戶「{cust_name}」！")
+          st.rerun()
+
+    st.markdown("---")
+    st.subheader("📋 現有客戶清單")
+    df_cust = get_data("客戶資料庫")
+    if not df_cust.empty:
+      st.dataframe(df_cust, use_container_width=True)
+      cust_ids = df_cust[df_cust.columns[0]].astype(str).tolist()
+      selected_cust_id = st.selectbox(
+          "選擇要刪除的客戶編號", cust_ids, key="del_cust"
+      )
+      if st.button("🗑️ 刪除此客戶"):
+        if delete_data("客戶資料庫", selected_cust_id):
+          st.success(f"已成功刪除客戶編號：{selected_cust_id}")
+          st.rerun()
+    else:
+      st.info("目前尚無客戶資料。")
+
+  # -----------------------------------------
+  # TAB 3: 進貨與庫存管理 (含照片預覽)
+  # -----------------------------------------
+  with tab3:
     st.header("📦 新增進貨與庫存管理")
 
     df_db = get_data("蘭花資料庫")
@@ -260,7 +302,6 @@ else:
     if not df_inv.empty:
       st.dataframe(df_inv, use_container_width=True)
 
-      # 建立資料庫名稱到照片的對應字典
       photo_lookup = {}
       if not df_db.empty and "品種名稱" in df_db.columns and "相片路徑" in df_db.columns:
         for _, r in df_db.iterrows():
@@ -269,7 +310,6 @@ else:
       st.markdown("#### 🖼️ 各進貨品項對應照片檢視")
       for _, row in df_inv.iterrows():
         item_n = row.get("品項名稱/品種", "")
-        # 尋找是否有對應的照片
         img_path = photo_lookup.get(str(item_n), "")
         c1, c2 = st.columns([1, 4])
         with c1:
@@ -296,12 +336,12 @@ else:
       st.info("目前尚無進貨資料。")
 
   # -----------------------------------------
-  # TAB 3: 退貨管理區 (細分退貨類型與對象)
+  # TAB 4: 退貨管理區 (對象聯動客戶資料庫)
   # -----------------------------------------
-  with tab3:
+  with tab4:
     st.header("🔄 退貨與不良品管理區")
     st.markdown(
-        "可清楚區分【我們向花農退貨】或【批發商向我們退貨】，並記錄退貨對象與計算總金額。"
+        "可清楚區分【我們向花農退貨】或【批發商向我們退貨】，對象可從「客戶資料庫」選取或自行輸入。"
     )
 
     df_inv_chk = get_data("進貨表")
@@ -312,6 +352,13 @@ else:
             + df_inv_chk["品項名稱/品種"]
         ).tolist()
         if not df_inv_chk.empty and "項目編號" in df_inv_chk.columns
+        else []
+    )
+
+    df_cust_chk = get_data("客戶資料庫")
+    cust_names_list = (
+        df_cust_chk["客戶名稱"].tolist()
+        if not df_cust_chk.empty and "客戶名稱" in df_cust_chk.columns
         else []
     )
 
@@ -326,9 +373,15 @@ else:
                 "2. 批發商向我們退貨 (客戶退回)",
             ],
         )
-        party_name = st.text_input(
-            "填寫對象名稱 (花農名稱 或 批發客戶名稱)", value="某某花農 / 某某花店"
+
+        party_mode = st.radio(
+            "對象名稱輸入方式", ["從客戶資料庫選取", "自行輸入"], horizontal=True
         )
+        if party_mode == "從客戶資料庫選取" and cust_names_list:
+          party_name = st.selectbox("選擇客戶/花店", cust_names_list)
+        else:
+          party_name = st.text_input("自行輸入對象名稱 (花農/批發商)", value="某某花農")
+
       with col_r2:
         target_item = st.selectbox(
             "關聯進貨批次/品項",
@@ -378,9 +431,9 @@ else:
       st.info("目前尚無退貨紀錄。")
 
   # -----------------------------------------
-  # TAB 4: 訂單與帳務管理
+  # TAB 5: 訂單與帳務管理
   # -----------------------------------------
-  with tab4:
+  with tab5:
     st.header("💰 訂單登錄與帳務管理（支援批發與零售）")
 
     df_inv_check = get_data("進貨表")
@@ -514,12 +567,13 @@ else:
       st.info("目前尚無訂單資料。")
 
   # -----------------------------------------
-  # TAB 5: A4 橫式與直式輓聯產生器
+  # TAB 6: A4 輓聯與卡片產生器
   # -----------------------------------------
-  with tab5:
-    st.header("🖨️ A4 輓聯與卡片產生器 (支援橫式與直式)")
+  with tab6:
+    st.header("🖨️ A4 輓聯與喜慶賀卡產生器")
     st.markdown(
-        "你可以自由選擇 **A4 橫式排版**（敬輓固定在名字正下方）或 **A4 直式排版**。"
+        "【喪禮傳統輓聯】：王大明在敬輓正上方，且敬輓固定在左下方角落。<br>【喜慶賀卡】："
+        " 上款自動帶入恭祝，中款可快速選擇 5 大經典賀詞。"
     )
 
     card_mode = st.selectbox("選擇卡片類型", ["喪禮傳統輓聯", "喜慶 / 開幕賀卡"])
@@ -554,8 +608,8 @@ else:
         mid_text = st.text_input("輸入中款輓辭 (如: 上品上生)", value="上品上生")
       with col_l:
         st.markdown("**【下款與敬輓設定】**")
-        sender_company = st.text_input("左下機關/公司", value="臺北市政府")
-        sender_name = st.text_input("右下落款名字", value="王大明")
+        sender_company = st.text_input("機關/公司 (放右下或對側)", value="臺北市政府")
+        sender_name = st.text_input("落款名字 (王大明)", value="王大明")
         kwan_text = st.text_input("敬輓字樣", value="敬輓")
 
       st.markdown("---")
@@ -567,6 +621,7 @@ else:
       )
 
       if orientation == "A4 橫式排版":
+        # 橫式：左下方角落放 王大明 (在上方) 與 敬輓 (在下方正下方)
         a4_html = f"""
                 <style>
                 .a4-landscape {{
@@ -591,14 +646,14 @@ else:
                     justify-content: space-between;
                     align-items: flex-end;
                 }}
-                .row-lower-left {{ font-size: {sz_lower}px; letter-spacing: 4px; }}
-                .row-lower-right {{
+                .row-lower-left-group {{
                     display: flex;
                     flex-direction: column;
                     align-items: center;
                     font-size: {sz_lower}px;
                     letter-spacing: 4px;
                 }}
+                .row-lower-right {{ font-size: {sz_lower}px; letter-spacing: 4px; }}
                 @media print {{
                     @page {{ size: A4 landscape; }}
                     body * {{ visibility: hidden; }}
@@ -610,15 +665,16 @@ else:
                     <div class="row-upper"><span>{upper_text}</span></div>
                     <div class="row-center"><span>{mid_text}</span></div>
                     <div class="row-bottom-area">
-                        <div class="row-lower-left"><span>{sender_company}</span></div>
-                        <div class="row-lower-right">
+                        <div class="row-lower-left-group">
                             <div>{sender_name}</div>
                             <div style="font-size: {sz_kwan}px; margin-top: 6px;">{kwan_text}</div>
                         </div>
+                        <div class="row-lower-right"><span>{sender_company}</span></div>
                     </div>
                 </div>
                 """
       else:
+        # 直式：左下方角落放 王大明 (在上方) 與 敬輓 (在下方)
         a4_html = f"""
                 <style>
                 .a4-portrait {{
@@ -638,8 +694,14 @@ else:
                 }}
                 .col-right {{ writing-mode: vertical-rl; font-size: {sz_upper}px; letter-spacing: 4px; height: 90%; display: flex; align-items: flex-start; }}
                 .col-center {{ writing-mode: vertical-rl; font-size: {sz_mid}px; letter-spacing: 12px; height: 90%; display: flex; justify-content: center; align-items: center; font-weight: bold; }}
-                .col-left-group {{ height: 90%; display: flex; gap: 15px; align-items: flex-end; }}
-                .col-kwan {{ writing-mode: vertical-rl; font-size: {sz_kwan}px; letter-spacing: 4px; }}
+                .col-left-group {{ height: 90%; display: flex; gap: 20px; align-items: flex-end; }}
+                .col-bottom-left-stack {{
+                    writing-mode: vertical-rl;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: flex-start;
+                    letter-spacing: 4px;
+                }}
                 .col-lower {{ writing-mode: vertical-rl; font-size: {sz_lower}px; letter-spacing: 4px; }}
                 @media print {{
                     @page {{ size: A4 portrait; }}
@@ -650,8 +712,10 @@ else:
                 </style>
                 <div class="a4-portrait">
                     <div class="col-left-group">
-                        <div class="col-kwan"><span>{kwan_text}</span></div>
-                        <div class="col-lower"><span>{sender_name}</span></div>
+                        <div class="col-bottom-left-stack">
+                            <div style="font-size: {sz_lower}px; margin-bottom: 10px;">{sender_name}</div>
+                            <div style="font-size: {sz_kwan}px;">{kwan_text}</div>
+                        </div>
                         <div class="col-lower"><span>{sender_company}</span></div>
                     </div>
                     <div class="col-center"><span>{mid_text}</span></div>
@@ -663,9 +727,34 @@ else:
 
     else:
       st.markdown("### 🌸 喜慶 / 開幕賀卡設定")
-      recipient_c = st.text_input("收花人 / 對象", value="大吉大利商行 啟")
-      blessing_c = st.text_area("祝賀內文", value="祝 開張大吉 生意興隆 財源廣進")
-      sender_c = st.text_input("送花人署名", value="好友 王小明 敬賀")
+      c_col_1, c_col_2 = st.columns(2)
+      with c_col_1:
+        recipient_c = st.text_input("收花人 / 對象", value="大吉大利商行 啟")
+        upper_joy = f"恭祝 {recipient_c}"
+
+        mid_preset = st.selectbox(
+            "選擇中款經典祝賀辭",
+            [
+                "鴻圖大展",
+                "駿業宏開",
+                "生意興隆",
+                "財源廣進",
+                "大業千秋",
+                "自行輸入...",
+            ],
+        )
+        if mid_preset == "自行輸入...":
+          mid_joy = st.text_input("自訂中款內文", value="開張大吉")
+        else:
+          mid_joy = mid_preset
+
+      with c_col_2:
+        sender_c = st.text_input("送花人署名", value="好友 王小明")
+        sender_suffix = st.selectbox("署名結尾選項", ["敬賀", "敬獻"])
+        full_sender = f"{sender_c} {sender_suffix}"
+
+      st.markdown("---")
+      st.markdown("#### 👁️ 預覽喜慶賀卡畫面")
 
       a4_joy_html = f"""
             <style>
@@ -684,9 +773,9 @@ else:
                 box-shadow: 0 0 15px rgba(0,0,0,0.1);
                 color: #222;
             }}
-            .joy-title {{ font-size: 32px; font-weight: bold; border-bottom: 2px solid #333; padding-bottom: 15px; }}
-            .joy-body {{ font-size: 40px; line-height: 2.2; flex-grow: 1; display: flex; align-items: center; justify-content: center; text-align: center; white-space: pre-wrap; }}
-            .joy-footer {{ font-size: 28px; text-align: right; border-top: 1.5px solid #ddd; padding-top: 20px; }}
+            .joy-title {{ font-size: 36px; font-weight: bold; border-bottom: 2px solid #333; padding-bottom: 15px; letter-spacing: 2px; }}
+            .joy-body {{ font-size: 56px; font-weight: bold; line-height: 2.2; flex-grow: 1; display: flex; align-items: center; justify-content: center; text-align: center; letter-spacing: 8px; color: #b22222; }}
+            .joy-footer {{ font-size: 32px; text-align: right; border-top: 1.5px solid #ddd; padding-top: 20px; letter-spacing: 2px; }}
             @media print {{
                 @page {{ size: A4 portrait; }}
                 body * {{ visibility: hidden; }}
@@ -695,13 +784,13 @@ else:
             }}
             </style>
             <div class="a4-joy">
-                <div class="joy-title">致：{recipient_c}</div>
-                <div class="joy-body">{blessing_c}</div>
-                <div class="joy-footer"><strong>{sender_c}</strong></div>
+                <div class="joy-title">{upper_joy}</div>
+                <div class="joy-body">{mid_joy}</div>
+                <div class="joy-footer"><strong>{full_sender}</strong></div>
             </div>
             """
       st.markdown(a4_joy_html, unsafe_allow_html=True)
 
     st.info(
-        "💡 列印提示：按下 **Ctrl + P**，印表機的紙張方向請選擇對應的**橫向 (Landscape)** 或**直向 (Portrait)** 即可！"
+        "💡 列印提示：按下 **Ctrl + P**，印表機的紙張方向請選擇對應的**橫向 (Landscape)** 或**直向 (Portrait)** 即可完美列印！"
     )
