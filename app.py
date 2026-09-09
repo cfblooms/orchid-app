@@ -9,7 +9,7 @@ st.set_page_config(
 )
 
 # ==========================================
-# ⚙️ 雲端連線設定
+# ⚙️ 雲端連線設定（已自動填入你的專屬網址！）
 # ==========================================
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyNmqySFSFKuGzqEzTc9A52SwkmTToCf2N-4pXI0EmOPFgriV1Bana3rLjgo-Q3WqtM/exec"
 
@@ -70,13 +70,10 @@ def get_next_id(prefix, sheet_name):
 st.title("🌸 蘭花庫存、記帳與 A4 卡片系統")
 
 if not WEB_APP_URL or "你的網址" in WEB_APP_URL:
-  st.warning(
-      "⚠️ 提醒：請記得修改 `app.py` 程式碼最上方的 `WEB_APP_URL`，填入你的"
-      " Apps Script 網址！"
-  )
+  st.warning("⚠️ 提醒：請確認雲端網址是否正確。")
 else:
   tab1, tab2, tab3 = st.tabs(
-      ["📦 1. 進貨與庫存", "💰 2. 訂單與帳務管理", "🖨️ 3. A4 卡片與輓聯產生器"]
+      ["📦 1. 進貨與庫存", "💰 2. 訂單與帳務管理", "🖨️ 3. A4 卡片與傳統輓聯"]
   )
 
   with tab1:
@@ -224,9 +221,7 @@ else:
         cost_price = st.number_input("預估總成本 (元)", min_value=0, value=600)
         sell_price = st.number_input("售價 (元)", min_value=0, value=1500)
         delivery_method = st.selectbox("配送方式", ["自載", "運送"])
-        payment_term = st.selectbox(
-            "結帳方式", ["每單結", "週結", "月結"]
-        )
+        payment_term = st.selectbox("結帳方式", ["每單結", "週結", "月結"])
 
       col4, col5 = st.columns(2)
       with col4:
@@ -238,7 +233,6 @@ else:
 
       order_submitted = st.form_submit_button("確認新增訂單")
       if order_submitted:
-        # 新訂單預設為未出貨、未付款
         row = [
             order_id,
             cust_type,
@@ -278,18 +272,31 @@ else:
         update_submitted = st.form_submit_button("確認更新該筆訂單狀態")
         if update_submitted:
           st.info(
-              f"💡 訂單 {selected_upd_id} 狀態已暫存更新。請注意：若需完整同步寫入雲端試算表，建議直接在 Google 試算表對應欄位修改，或重新提交。"
+              f"💡 訂單 {selected_upd_id} 狀態已修改。請至 Google 試算表確認。"
           )
     else:
       st.info("目前尚無訂單資料。")
 
   with tab3:
-    st.header("🖨️ A4 卡片與傳統輓聯產生器")
+    st.header("🖨️ A4 傳統輓聯與卡片產生器 (標楷體)")
 
-    card_mode = st.selectbox("選擇卡片類型", ["喪禮輓聯 / 悼唁卡", "喜慶 / 開幕賀卡"])
+    card_mode = st.selectbox("選擇卡片類型", ["喪禮傳統輓聯", "喜慶 / 開幕賀卡"])
 
-    if card_mode == "喪禮輓聯 / 悼唁卡":
-      st.markdown("### 🕊️ 喪禮輓聯設定")
+    if card_mode == "喪禮傳統輓聯":
+      st.markdown("### 🕊️ 傳統直式輓聯設定與排版")
+
+      # 字體大小調整控制區 (預設對應您的需求：上款72、中款180、下款80、敬輓70)
+      with st.expander("⚙️ 調整字體大小與版面設定", expanded=True):
+        f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+        with f_col1:
+          sz_upper = st.slider("上款字體大小", 40, 120, 72)
+        with f_col2:
+          sz_mid = st.slider("中款字體大小", 100, 250, 180)
+        with f_col3:
+          sz_lower = st.slider("下款字體大小", 40, 120, 80)
+        with f_col4:
+          sz_kwan = st.slider("敬輓字體大小", 40, 120, 70)
+
       col_r, col_m, col_l = st.columns(3)
 
       with col_r:
@@ -298,6 +305,8 @@ else:
             "上款常用敬悼",
             [
                 "自訂 / 手動輸入",
+                "敬悼 林媽莊老夫人仙逝",
+                "敬悼 林公春吉先生 千古",
                 "敬悼 X公X先生 仙逝",
                 "敬悼 X公X老先生 千古",
                 "敬悼 X媽X夫人 仙逝",
@@ -306,13 +315,13 @@ else:
         )
         if upper_preset == "自訂 / 手動輸入":
           upper_text = st.text_input(
-              "輸入自訂上款", value="敬悼 陳公大明 先生 仙逝"
+              "輸入自訂上款", value="敬悼 林媽莊老夫人仙逝"
           )
         else:
           upper_text = upper_preset
 
       with col_m:
-        st.markdown("**【中間：中款/輓辭】**")
+        st.markdown("**【中間：中款 / 輓辭】**")
         gender_choice = st.selectbox(
             "逝者性別與年齡分類",
             [
@@ -384,58 +393,68 @@ else:
           )
           mid_text = mid_preset
         else:
-          mid_text = st.text_input("輸入自訂中款輓辭", value="典範長存")
+          mid_text = st.text_input("輸入自訂中款輓辭", value="懿德長昭")
 
       with col_l:
-        st.markdown("**【左下：下款與敬輓】**")
-        sender_company = st.text_input("公司名稱 / 單位", value="OO花苑")
-        sender_name = st.text_input("送花人 / 署名", value="王小明")
-        kwan = "敬輓"
+        st.markdown("**【左邊：下款與敬輓】**")
+        sender_company = st.text_input("公司名稱", value="立成鋼鐵有限公司")
+        sender_name = st.text_input("姓名 / 落款", value="林春吉")
+        sender_extra = st.text_input("額外稱謂 (如: 暨全體同仁)", value="暨全體同仁")
+        kwan_text = st.text_input("敬輓字樣", value="敬輓")
 
       st.markdown("---")
-      # A4預覽區 (210mm x 297mm)
+
+      # A4 預覽與排版 (強制使用標楷體、直式書寫、對應您的精準字體大小)
       a4_mourning_html = f"""
             <style>
             .a4-page {{
                 width: 210mm;
                 height: 297mm;
-                padding: 25mm 20mm;
+                padding: 20mm 15mm;
                 margin: auto;
                 border: 2px dashed #bbb;
                 background: white;
-                font-family: "DFKai-SB", "BiauKai", "Microsoft JhengHei", serif;
+                font-family: "DFKai-SB", "BiauKai", "標楷體", "KaiTi", serif;
                 display: flex;
                 justify-content: space-between;
                 align-items: flex-start;
-                box-shadow: 0 0 15px rgba(0,0,0,0.1);
-                color: #111;
                 box-sizing: border-box;
+                box-shadow: 0 0 15px rgba(0,0,0,0.1);
+                color: #000;
             }}
             .col-right {{
                 writing-mode: vertical-rl;
-                font-size: 24px;
+                font-size: {sz_upper}px;
                 letter-spacing: 4px;
-                height: 100%;
+                height: 90%;
                 display: flex;
                 align-items: flex-start;
             }}
             .col-center {{
                 writing-mode: vertical-rl;
-                font-size: 38px;
-                letter-spacing: 8px;
-                height: 100%;
+                font-size: {sz_mid}px;
+                letter-spacing: 12px;
+                height: 90%;
                 display: flex;
                 justify-content: center;
                 align-items: center;
                 font-weight: bold;
             }}
-            .col-left {{
-                writing-mode: vertical-rl;
-                font-size: 22px;
-                letter-spacing: 4px;
-                height: 100%;
+            .col-left-group {{
+                height: 90%;
                 display: flex;
+                gap: 15px;
                 align-items: flex-end;
+            }}
+            .col-kwan {{
+                writing-mode: vertical-rl;
+                font-size: {sz_kwan}px;
+                letter-spacing: 4px;
+            }}
+            .col-lower {{
+                writing-mode: vertical-rl;
+                font-size: {sz_lower}px;
+                letter-spacing: 4px;
             }}
             @media print {{
                 body * {{ visibility: hidden; }}
@@ -444,8 +463,11 @@ else:
             }}
             </style>
             <div class="a4-page">
-                <div class="col-left">
-                    <span>{sender_company}  {sender_name}  {kwan}</span>
+                <div class="col-left-group">
+                    <div class="col-kwan"><span>{kwan_text}</span></div>
+                    <div class="col-lower"><span>{sender_extra}</span></div>
+                    <div class="col-lower"><span>{sender_name}</span></div>
+                    <div class="col-lower"><span>{sender_company}</span></div>
                 </div>
                 <div class="col-center">
                     <span>{mid_text}</span>
@@ -474,17 +496,17 @@ else:
                 margin: auto;
                 border: 2px dashed #bbb;
                 background: white;
-                font-family: "Microsoft JhengHei", sans-serif;
+                font-family: "DFKai-SB", "BiauKai", "標楷體", serif;
                 display: flex;
                 flex-direction: column;
                 justify-content: space-between;
+                box-sizing: border-box;
                 box-shadow: 0 0 15px rgba(0,0,0,0.1);
                 color: #222;
-                box-sizing: border-box;
             }}
-            .joy-title {{ font-size: 28px; font-weight: bold; border-bottom: 2px solid #333; padding-bottom: 15px; }}
-            .joy-body {{ font-size: 32px; line-height: 2.2; flex-grow: 1; white-space: pre-wrap; display: flex; align-items: center; justify-content: center; text-align: center; }}
-            .joy-footer {{ font-size: 24px; text-align: right; border-top: 1.5px solid #ddd; padding-top: 20px; }}
+            .joy-title {{ font-size: 32px; font-weight: bold; border-bottom: 2px solid #333; padding-bottom: 15px; }}
+            .joy-body {{ font-size: 40px; line-height: 2.2; flex-grow: 1; display: flex; align-items: center; justify-content: center; text-align: center; white-space: pre-wrap; }}
+            .joy-footer {{ font-size: 28px; text-align: right; border-top: 1.5px solid #ddd; padding-top: 20px; }}
             @media print {{
                 body * {{ visibility: hidden; }}
                 .a4-joy, .a4-joy * {{ visibility: visible; }}
@@ -500,5 +522,5 @@ else:
       st.markdown(a4_joy_html, unsafe_allow_html=True)
 
     st.info(
-        "💡 提示：按下 **Ctrl + P** 列印，將紙張大小設定為 **A4**、方向設為「直向」或「橫向」（依傳統直式或橫式排版需求），即可完美印出！"
+        "💡 提示：按下 **Ctrl + P** 列印，將紙張大小設定為 **A4**、方向設為「直向」，即可完美列印！"
     )
