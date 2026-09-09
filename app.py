@@ -6,7 +6,7 @@ import os
 st.set_page_config(page_title="A4 賀卡/輓聯產生器", layout="wide", page_icon="📜")
 
 st.title("📜 A4 專業賀卡與輓聯產生器")
-st.markdown("支援**直式與橫式 A4** 排版、依年齡/性別精準對應中款、**下款三格獨立輸入**，以及**上中下款全方位位置調整**！")
+st.markdown("支援**直式與橫式 A4** 排版、依年齡/性別精準對應中款、**三格下款輸入**，以及**自由調整上中下款位置**！")
 
 # 側邊欄設定
 st.sidebar.header("⚙️ 版面與模式設定")
@@ -15,24 +15,9 @@ card_mode = st.sidebar.radio("卡片類型", ["喪禮致意 (輓聯/花圈)", "�
 orientation = st.sidebar.radio("版面方向", ["直式 (Portrait)", "橫式 (Landscape)"])
 
 st.sidebar.markdown("---")
-st.sidebar.header("📐 上中下款獨立位置微調")
-st.sidebar.markdown("您可以針對各個區塊獨立微調其位置，滿足不同的版面視覺需求：")
-
-# 上款位置微調
-st.sidebar.subheader("📌 上款位置微調")
-upper_offset_x = st.sidebar.slider("上款 左右微調 (px)", -100, 100, 0, 5)
-upper_offset_y = st.sidebar.slider("上款 上下微調 (px)", -100, 100, 0, 5)
-
-# 中款位置微調
-st.sidebar.subheader("📌 中款位置微調")
-middle_offset_x = st.sidebar.slider("中款 左右微調 (px)", -100, 100, 0, 5)
-middle_offset_y = st.sidebar.slider("中款 上下微調 (px)", -100, 100, 0, 5)
-
-# 下款位置微調
-st.sidebar.subheader("📌 下款位置微調")
-lower_offset_x = st.sidebar.slider("下款 左右微調 (px)", -100, 100, 0, 5)
-lower_offset_y = st.sidebar.slider("下款 上下微調 (px)", -100, 100, 0, 5)
-
+st.sidebar.header("📐 座標與位置微調")
+top_pos_offset = st.sidebar.slider("整體上下微調 (px)", -50, 50, 0, 5)
+col_spacing = st.sidebar.slider("欄位間距微調 (px)", 20, 100, 40, 5)
 
 # 根據模式設定內容
 upper_text = ""
@@ -142,13 +127,12 @@ else:
   else:
     middle_text = middle_choice
 
-# 下款三格設定（多人送禮可分開填寫）
-st.sidebar.subheader("✍️ 下款三格設定 (多人送禮/署名)")
-lower_line1 = st.sidebar.text_input("下款第一格 (例如：機關/公司/職稱)", "桃園市議員")
-lower_line2 = st.sidebar.text_input("下款第二格 (例如：第一位名字/主獻者)", "李宗豪")
+# 三格下款設定
+st.sidebar.subheader("✍️ 下款三格設定")
+lower_line1 = st.sidebar.text_input("下款第一格 (公司/機關單位)", "桃園市議員")
+lower_line2 = st.sidebar.text_input("下款第二格 (名字/職稱)", "李宗豪")
 lower_line3 = st.sidebar.text_input(
-    "下款第三格 (例如：第二位名字 或 敬輓/敬賀)",
-    "敬輓" if card_mode.startswith("喪禮") else "敬賀",
+    "下款第三格 (敬意結尾)", "敬輓" if card_mode.startswith("喪禮") else "敬賀"
 )
 
 # 字體大小設定
@@ -162,7 +146,7 @@ st.subheader("👁️ A4 排版即時預覽")
 
 is_portrait = "直式" in orientation
 
-# HTML/CSS 排版 (支援獨立上下左右位移轉換)
+# HTML/CSS 排版
 html_content = f"""
 <!DOCTYPE html>
 <html>
@@ -194,37 +178,26 @@ html_content = f"""
   
   /* 直式排版 (Vertical) */
   .layout-portrait {{
+    writing-mode: vertical-rl;
     height: 100%;
     width: 100%;
-    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: {top_pos_offset}px;
   }}
   .layout-portrait .col-right {{
-    position: absolute;
-    right: 25mm;
-    top: 50%;
-    transform: translateY(-50%) translate({-upper_offset_x}px, {upper_offset_y}px);
-    writing-mode: vertical-rl;
     font-size: {font_size_upper}pt;
     font-weight: bold;
     letter-spacing: 3px;
   }}
   .layout-portrait .col-center {{
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%) translate({-middle_offset_x}px, {middle_offset_y}px);
-    writing-mode: vertical-rl;
     font-size: {font_size_middle}pt;
     font-weight: bold;
     letter-spacing: 8px;
-    text-align: center;
+    margin: 0 {col_spacing}px;
   }}
   .layout-portrait .col-left {{
-    position: absolute;
-    left: 25mm;
-    top: 50%;
-    transform: translateY(-50%) translate({-lower_offset_x}px, {lower_offset_y}px);
-    writing-mode: vertical-rl;
     font-size: {font_size_lower}pt;
     letter-spacing: 2px;
     display: flex;
@@ -242,7 +215,6 @@ html_content = f"""
     position: absolute;
     top: 25mm;
     right: 25mm;
-    transform: translate({-upper_offset_x}px, {upper_offset_y}px);
     font-size: {font_size_upper}pt;
     font-weight: bold;
     letter-spacing: 2px;
@@ -251,7 +223,7 @@ html_content = f"""
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%) translate({middle_offset_x}px, {middle_offset_y}px);
+    transform: translate(-50%, -50%);
     font-size: {font_size_middle}pt;
     font-weight: bold;
     letter-spacing: 8px;
@@ -262,7 +234,6 @@ html_content = f"""
     position: absolute;
     bottom: 25mm;
     left: 25mm;
-    transform: translate({lower_offset_x}px, {-lower_offset_y}px);
     font-size: {font_size_lower}pt;
     letter-spacing: 2px;
     display: flex;
