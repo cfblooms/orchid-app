@@ -14,13 +14,13 @@ st.set_page_config(page_title="A4 賀卡與輓聯產生系統", layout="wide")
 
 st.title("🖨️ A4 賀卡與輓聯自動產生與排版管理系統")
 
-# 初始化 Session State 以記錄各個元件的位置與字體大小（支援獨立移動與縮放）
+# 初始化 Session State 以記錄各個元件的位置與字體大小（支援 X、Y 軸與字體大小獨立調整）
 for key, default_val in [
-    ("top_x", 50), ("top_y", 40), ("font_top", 22),
-    ("mid_x", 50), ("mid_y", 200), ("font_mid", 48),
-    ("comp_x", 20), ("comp_y", 800), ("font_comp", 20),
-    ("name_x", 50), ("name_y", 850), ("font_name", 20),
-    ("suff_x", 80), ("suff_y", 850), ("font_suff", 20),
+    ("top_x", 150), ("top_y", 40), ("font_top", 22),
+    ("mid_x", 180), ("mid_y", 200), ("font_mid", 48),
+    ("comp_x", 60), ("comp_y", 800), ("font_comp", 20),
+    ("name_x", 250), ("name_y", 850), ("font_name", 20),
+    ("suff_x", 500), ("suff_y", 850), ("font_suff", 20),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default_val
@@ -72,7 +72,7 @@ else:
             col_o4, col_o5 = st.columns(2)
             with col_o4:
                 recipient_name = st.text_input(
-                    "收花人 / 逝者姓名", value="王小明先生 / 某某公司"
+                    "收花人", value="王小明先生 / 某某公司"
                 )
             with col_o5:
                 orientation = st.selectbox("版面方向", ["直式", "橫式"])
@@ -141,10 +141,10 @@ else:
             with col_s2:
                 st.subheader("二、中款設定")
                 if card_type == "喪禮（輓聯）":
-                    gender = st.radio("性別", ["女", "男"], horizontal=True)
+                    gender = st.radio("性別選擇", ["女", "男"], horizontal=True)
                     if gender == "女":
-                        female_age = st.selectbox(
-                            "女性身份與年齡",
+                        age_group = st.selectbox(
+                            "年齡層選擇",
                             [
                                 "49歲以下（年輕、未婚或一般年輕女性，稱女士）",
                                 "50至79歲（稱夫人／女士）",
@@ -152,39 +152,39 @@ else:
                                 "自訂中款",
                             ],
                         )
-                        if "49歲以下" in female_age:
+                        if "49歲以下" in age_group:
                             middle_options = ["芳華早謝", "遽促芳齡", "妝台月冷", "香消玉殞", "音容宛在"]
-                        elif "50至79歲" in female_age:
+                        elif "50至79歲" in age_group:
                             middle_options = ["懿範長存", "淑德永昭", "萱萎北堂", "慈雲縹緲"]
-                        elif "80歲以上" in female_age:
+                        elif "80歲以上" in age_group:
                             middle_options = ["母儀千古", "駕返瑤池", "慈輝永昭", "寶婺星沉"]
                         else:
                             middle_options = []
                     else:
-                        male_age = st.selectbox(
-                            "男性身份與年齡",
+                        age_group = st.selectbox(
+                            "年齡層選擇",
                             [
-                                "49歲以下（稱「先生」）",
-                                "50至69歲（稱「先生」）",
-                                "70至79歲（稱「老先生」）",
-                                "80歲以上（稱「老先生」）",
+                                "49 歲以下（稱「先生」）",
+                                "50 至 69 歲（稱「先生」）",
+                                "70 至 79 歲（稱「老先生」）",
+                                "80 歲以上（稱「老先生」）",
                                 "自訂中款",
                             ],
                         )
-                        if "49歲以下" in male_age:
+                        if "49 歲以下" in age_group:
                             middle_options = ["星隕少微", "壯志未酬", "天不假年", "英年仙去", "音容宛在"]
-                        elif "50至69歲" in male_age:
+                        elif "50 至 69 歲" in age_group:
                             middle_options = ["長才未盡", "棟折梁摧", "典則空留", "悵望音容", "英氣頓杳"]
-                        elif "70至79歲" in male_age:
+                        elif "70 至 79 歲" in age_group:
                             middle_options = ["駕鶴西歸", "道範長存", "碩德堪欽", "儀型足式", "高風亮節"]
-                        elif "80歲以上" in male_age:
+                        elif "80 歲以上" in age_group:
                             middle_options = ["福壽全歸", "高山仰止", "碩德貽徽", "德望永昭", "典範長存"]
                         else:
                             middle_options = []
 
                     if middle_options:
                         selected_mid = st.selectbox(
-                            "選擇常用中款詞語", middle_options + ["自訂輸入"]
+                            "自動對應常用中款詞語", middle_options + ["自訂輸入"]
                         )
                         middle_text = (
                             st.text_input("輸入自訂中款", "往生極樂")
@@ -269,7 +269,7 @@ else:
                     card_id,
                     selected_order_id,
                     card_type,
-                    recipient_name, # 帶入收花人 / 逝者姓名
+                    recipient_name, # 帶入收花人
                     middle_text,
                     upper_text,
                     lower_text_db,
@@ -285,33 +285,38 @@ else:
                         "儲存失敗，請檢查網路或 Google Apps Script 部署狀態。"
                     )
 
-        # --- 側邊欄：各元件獨立微調控制 (X, Y 軸與字體大小) ---
+        # --- 側邊欄：各元件水平(X)、垂直(Y)與字體大小微調控制 ---
         st.sidebar.markdown("---")
-        st.sidebar.header("🎚️ 獨立版面與字體微調控制")
+        st.sidebar.header("🎚️ 雙向排版與字體微調控制 (X, Y 軸)")
         
-        with st.sidebar.expander("📌 上款設定"):
-            st.session_state.font_top = st.slider("上款字體大小", 12, 50, st.session_state.font_top)
-            st.session_state.top_y = st.slider("上款垂直位置 (Y)", 0, 1000, st.session_state.top_y)
+        with st.sidebar.expander("📌 上款位置與字體"):
+            st.session_state.font_top = st.slider("上款字體大小", 12, 50, st.session_state.font_top, key="f_top")
+            st.session_state.top_x = st.slider("上款水平位置 (X)", 0, 600, st.session_state.top_x, key="x_top")
+            st.session_state.top_y = st.slider("上款垂直位置 (Y)", 0, 900, st.session_state.top_y, key="y_top")
 
-        with st.sidebar.expander("📌 中款設定"):
-            st.session_state.font_mid = st.slider("中款字體大小", 20, 150, st.session_state.font_mid)
-            st.session_state.mid_y = st.slider("中款垂直位置 (Y)", 0, 1000, st.session_state.mid_y)
+        with st.sidebar.expander("📌 中款位置與字體"):
+            st.session_state.font_mid = st.slider("中款字體大小", 20, 150, st.session_state.font_mid, key="f_mid")
+            st.session_state.mid_x = st.slider("中款水平位置 (X)", 0, 600, st.session_state.mid_x, key="x_mid")
+            st.session_state.mid_y = st.slider("中款垂直位置 (Y)", 0, 900, st.session_state.mid_y, key="y_mid")
 
-        with st.sidebar.expander("📌 下款單位 (公司) 設定"):
-            st.session_state.font_comp = st.slider("單位字體大小", 12, 40, st.session_state.font_comp)
-            st.session_state.comp_y = st.slider("單位垂直位置 (Y)", 0, 1000, st.session_state.comp_y)
+        with st.sidebar.expander("📌 下款單位 (公司) 位置與字體"):
+            st.session_state.font_comp = st.slider("單位字體大小", 12, 40, st.session_state.font_comp, key="f_comp")
+            st.session_state.comp_x = st.slider("單位水平位置 (X)", 0, 600, st.session_state.comp_x, key="x_comp")
+            st.session_state.comp_y = st.slider("單位垂直位置 (Y)", 0, 900, st.session_state.comp_y, key="y_comp")
 
-        with st.sidebar.expander("📌 下款名字 (5人) 設定"):
-            st.session_state.font_name = st.slider("名字字體大小", 12, 40, st.session_state.font_name)
-            st.session_state.name_y = st.slider("名字垂直位置 (Y)", 0, 1000, st.session_state.name_y)
+        with st.sidebar.expander("📌 下款名字 (5人) 位置與字體"):
+            st.session_state.font_name = st.slider("名字字體大小", 12, 40, st.session_state.font_name, key="f_name")
+            st.session_state.name_x = st.slider("名字水平位置 (X)", 0, 600, st.session_state.name_x, key="x_name")
+            st.session_state.name_y = st.slider("名字垂直位置 (Y)", 0, 900, st.session_state.name_y, key="y_name")
 
-        with st.sidebar.expander("📌 敬輓 / 敬悼 / 敬賀 設定"):
-            st.session_state.font_suff = st.slider("敬意字體大小", 12, 40, st.session_state.font_suff)
-            st.session_state.suff_y = st.slider("敬意垂直位置 (Y)", 0, 1000, st.session_state.suff_y)
+        with st.sidebar.expander("📌 敬輓 / 敬賀 位置與字體"):
+            st.session_state.font_suff = st.slider("敬意字體大小", 12, 40, st.session_state.font_suff, key="f_suff")
+            st.session_state.suff_x = st.slider("敬意水平位置 (X)", 0, 600, st.session_state.suff_x, key="x_suff")
+            st.session_state.suff_y = st.slider("敬意垂直位置 (Y)", 0, 900, st.session_state.suff_y, key="y_suff")
 
-        # --- A4 即時排版預覽畫面 (獨立定位與縮放) ---
+        # --- A4 即時排版預覽畫面 (支援 X、Y 絕對定位) ---
         st.markdown("---")
-        st.subheader("📄 A4 即時排版預覽（各元件可獨立調整與預覽）")
+        st.subheader("📄 A4 即時排版預覽（支援左右、上下與字體自由微調）")
 
         container_style = """
             width: 100%;
@@ -330,27 +335,27 @@ else:
         layout_html = f"""
         <div style="{container_style}">
             <!-- 上款 -->
-            <div style="position: absolute; top: {st.session_state.top_y}px; left: 50%; transform: translateX(-50%); font-size: {st.session_state.font_top}px; white-space: nowrap; font-weight: bold;">
+            <div style="position: absolute; top: {st.session_state.top_y}px; left: {st.session_state.top_x}px; font-size: {st.session_state.font_top}px; white-space: nowrap; font-weight: bold;">
                 {upper_text}
             </div>
             
             <!-- 中款 -->
-            <div style="position: absolute; top: {st.session_state.mid_y}px; left: 50%; transform: translateX(-50%); font-size: {st.session_state.font_mid}px; white-space: nowrap; font-weight: bold; letter-spacing: 6px;">
+            <div style="position: absolute; top: {st.session_state.mid_y}px; left: {st.session_state.mid_x}px; font-size: {st.session_state.font_mid}px; white-space: nowrap; font-weight: bold; letter-spacing: 6px;">
                 {middle_text}
             </div>
             
             <!-- 下款單位 -->
-            <div style="position: absolute; top: {st.session_state.comp_y}px; left: 60px; font-size: {st.session_state.font_comp}px; white-space: nowrap; font-weight: bold;">
+            <div style="position: absolute; top: {st.session_state.comp_y}px; left: {st.session_state.comp_x}px; font-size: {st.session_state.font_comp}px; white-space: nowrap; font-weight: bold;">
                 {company_name}
             </div>
 
             <!-- 下款名字 (5人) -->
-            <div style="position: absolute; top: {st.session_state.name_y}px; right: 140px; font-size: {st.session_state.font_name}px; white-space: nowrap; font-weight: bold;">
+            <div style="position: absolute; top: {st.session_state.name_y}px; left: {st.session_state.name_x}px; font-size: {st.session_state.font_name}px; white-space: nowrap; font-weight: bold;">
                 {names_combined}
             </div>
 
-            <!-- 敬輓 / 敬悼 / 敬賀 -->
-            <div style="position: absolute; top: {st.session_state.suff_y}px; right: 60px; font-size: {st.session_state.font_suff}px; white-space: nowrap; font-weight: bold;">
+            <!-- 敬輓 / 敬賀 -->
+            <div style="position: absolute; top: {st.session_state.suff_y}px; left: {st.session_state.suff_x}px; font-size: {st.session_state.font_suff}px; white-space: nowrap; font-weight: bold;">
                 {suffix_text}
             </div>
         </div>
@@ -385,4 +390,5 @@ else:
         else:  
             st.info(
                 "目前雲端賀卡表中尚無資料，請至第一頁新增卡片或檢查 Google 試算表連線。"
+            )
             )
