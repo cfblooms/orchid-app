@@ -14,7 +14,7 @@ st.set_page_config(page_title="A4 賀卡與輓聯產生系統", layout="wide")
 
 st.title("🖨️ A4 賀卡與輓聯自動產生與排版管理系統")
 
-# 初始化 Session State 以記錄各個元件的位置與字體大小（支援 X、Y 軸與字體大小獨立調整）
+# 初始化 Session State 以記錄各個元件的位置與字體大小
 for key, default_val in [
     ("top_x", 150), ("top_y", 40), ("font_top", 22),
     ("mid_x", 180), ("mid_y", 200), ("font_mid", 48),
@@ -75,7 +75,9 @@ else:
                     "收花人", value="王小明先生 / 某某公司"
                 )
             with col_o5:
-                orientation = st.selectbox("版面方向", ["直式", "橫式"])
+                orientation = st.selectbox(
+                    "版面方向", ["直式 (傳統直排)", "橫式 (現代橫排)"]
+                )
 
             st.markdown("---")
             col_s1, col_s2 = st.columns(2)
@@ -269,7 +271,7 @@ else:
                     card_id,
                     selected_order_id,
                     card_type,
-                    recipient_name, # 帶入收花人
+                    recipient_name,
                     middle_text,
                     upper_text,
                     lower_text_db,
@@ -291,78 +293,122 @@ else:
         
         with st.sidebar.expander("📌 上款位置與字體"):
             st.session_state.font_top = st.slider("上款字體大小", 12, 50, st.session_state.font_top, key="f_top")
-            st.session_state.top_x = st.slider("上款水平位置 (X)", 0, 600, st.session_state.top_x, key="x_top")
+            st.session_state.top_x = st.slider("上款水平位置 (X)", 0, 800, st.session_state.top_x, key="x_top")
             st.session_state.top_y = st.slider("上款垂直位置 (Y)", 0, 900, st.session_state.top_y, key="y_top")
 
         with st.sidebar.expander("📌 中款位置與字體"):
             st.session_state.font_mid = st.slider("中款字體大小", 20, 150, st.session_state.font_mid, key="f_mid")
-            st.session_state.mid_x = st.slider("中款水平位置 (X)", 0, 600, st.session_state.mid_x, key="x_mid")
-            st.session_state.mid_y = st.slider("中款垂直位置 (Y)", 0, 900, st.session_state.mid_y, key="y_mid")
+            st.session_state.mid_x = st.slider("中款水平位置 (X)", 0, 800, st.session_state.mid_x, key="x_mid")
+            st.session_state.mid_y = st.slider("中_款垂直位置 (Y)", 0, 900, st.session_state.mid_y, key="y_mid")
 
         with st.sidebar.expander("📌 下款單位 (公司) 位置與字體"):
             st.session_state.font_comp = st.slider("單位字體大小", 12, 40, st.session_state.font_comp, key="f_comp")
-            st.session_state.comp_x = st.slider("單位水平位置 (X)", 0, 600, st.session_state.comp_x, key="x_comp")
+            st.session_state.comp_x = st.slider("單位水平位置 (X)", 0, 800, st.session_state.comp_x, key="x_comp")
             st.session_state.comp_y = st.slider("單位垂直位置 (Y)", 0, 900, st.session_state.comp_y, key="y_comp")
 
         with st.sidebar.expander("📌 下款名字 (5人) 位置與字體"):
             st.session_state.font_name = st.slider("名字字體大小", 12, 40, st.session_state.font_name, key="f_name")
-            st.session_state.name_x = st.slider("名字水平位置 (X)", 0, 600, st.session_state.name_x, key="x_name")
+            st.session_state.name_x = st.slider("名字水平位置 (X)", 0, 800, st.session_state.name_x, key="x_name")
             st.session_state.name_y = st.slider("名字垂直位置 (Y)", 0, 900, st.session_state.name_y, key="y_name")
 
         with st.sidebar.expander("📌 敬輓 / 敬賀 位置與字體"):
             st.session_state.font_suff = st.slider("敬意字體大小", 12, 40, st.session_state.font_suff, key="f_suff")
-            st.session_state.suff_x = st.slider("敬意水平位置 (X)", 0, 600, st.session_state.suff_x, key="x_suff")
+            st.session_state.suff_x = st.slider("敬意水平位置 (X)", 0, 800, st.session_state.suff_x, key="x_suff")
             st.session_state.suff_y = st.slider("敬意垂直位置 (Y)", 0, 900, st.session_state.suff_y, key="y_suff")
 
-        # --- A4 即時排版預覽畫面 (支援 X、Y 絕對定位) ---
+        # --- A4 即時排版預覽畫面 (自動適應直式 / 橫式格式) ---
         st.markdown("---")
-        st.subheader("📄 A4 即時排版預覽（支援左右、上下與字體自由微調）")
+        st.subheader("📄 A4 即時排版預覽")
 
-        container_style = """
-            width: 100%;
-            max-width: 650px;
-            height: 920px;
-            background: white;
-            color: black;
-            border: 2px solid #333;
-            position: relative;
-            margin: 0 auto;
-            font-family: 'DFKai-SB', 'BiauKai', 'STKaiti', serif;
-            box-shadow: 0px 4px 12px rgba(0,0,0,0.15);
-            overflow: hidden;
-        """
+        if "直式" in orientation:
+            # 傳統直排版樣式（對應圖一）
+            container_style = """
+                width: 100%;
+                max-width: 650px;
+                height: 920px;
+                background: white;
+                color: black;
+                border: 2px solid #333;
+                position: relative;
+                margin: 0 auto;
+                font-family: 'DFKai-SB', 'BiauKai', 'STKaiti', serif;
+                box-shadow: 0px 4px 12px rgba(0,0,0,0.15);
+                overflow: hidden;
+            """
+            layout_html = f"""
+            <div style="{container_style}">
+                <!-- 上款 (直排) -->
+                <div style="position: absolute; top: {st.session_state.top_y}px; left: {st.session_state.top_x}px; font-size: {st.session_state.font_top}px; writing-mode: vertical-rl; text-orientation: upright; font-weight: bold; letter-spacing: 4px;">
+                    {upper_text}
+                </div>
+                
+                <!-- 中款 (直排大字) -->
+                <div style="position: absolute; top: {st.session_state.mid_y}px; left: {st.session_state.mid_x}px; font-size: {st.session_state.font_mid}px; writing-mode: vertical-rl; text-orientation: upright; font-weight: bold; letter-spacing: 12px;">
+                    {middle_text}
+                </div>
+                
+                <!-- 下款單位 (直排) -->
+                <div style="position: absolute; top: {st.session_state.comp_y}px; left: {st.session_state.comp_x}px; font-size: {st.session_state.font_comp}px; writing-mode: vertical-rl; text-orientation: upright; font-weight: bold; letter-spacing: 4px;">
+                    {company_name}
+                </div>
 
-        layout_html = f"""
-        <div style="{container_style}">
-            <!-- 上款 -->
-            <div style="position: absolute; top: {st.session_state.top_y}px; left: {st.session_state.top_x}px; font-size: {st.session_state.font_top}px; white-space: nowrap; font-weight: bold;">
-                {upper_text}
-            </div>
-            
-            <!-- 中款 -->
-            <div style="position: absolute; top: {st.session_state.mid_y}px; left: {st.session_state.mid_x}px; font-size: {st.session_state.font_mid}px; white-space: nowrap; font-weight: bold; letter-spacing: 6px;">
-                {middle_text}
-            </div>
-            
-            <!-- 下款單位 -->
-            <div style="position: absolute; top: {st.session_state.comp_y}px; left: {st.session_state.comp_x}px; font-size: {st.session_state.font_comp}px; white-space: nowrap; font-weight: bold;">
-                {company_name}
-            </div>
+                <!-- 下款名字 (5人，直排) -->
+                <div style="position: absolute; top: {st.session_state.name_y}px; left: {st.session_state.name_x}px; font-size: {st.session_state.font_name}px; writing-mode: vertical-rl; text-orientation: upright; font-weight: bold; letter-spacing: 4px;">
+                    {names_combined}
+                </div>
 
-            <!-- 下款名字 (5人) -->
-            <div style="position: absolute; top: {st.session_state.name_y}px; left: {st.session_state.name_x}px; font-size: {st.session_state.font_name}px; white-space: nowrap; font-weight: bold;">
-                {names_combined}
+                <!-- 敬輓 / 敬賀 (直排) -->
+                <div style="position: absolute; top: {st.session_state.suff_y}px; left: {st.session_state.suff_x}px; font-size: {st.session_state.font_suff}px; writing-mode: vertical-rl; text-orientation: upright; font-weight: bold; letter-spacing: 4px;">
+                    {suffix_text}
+                </div>
             </div>
+            """
+        else:
+            # 現代橫排版樣式（對應圖二）
+            container_style = """
+                width: 100%;
+                max-width: 850px;
+                height: 600px;
+                background: white;
+                color: black;
+                border: 2px solid #333;
+                position: relative;
+                margin: 0 auto;
+                font-family: 'DFKai-SB', 'BiauKai', 'STKaiti', serif;
+                box-shadow: 0px 4px 12px rgba(0,0,0,0.15);
+                overflow: hidden;
+            """
+            layout_html = f"""
+            <div style="{container_style}">
+                <!-- 上款 -->
+                <div style="position: absolute; top: {st.session_state.top_y}px; left: {st.session_state.top_x}px; font-size: {st.session_state.font_top}px; white-space: nowrap; font-weight: bold;">
+                    {upper_text}
+                </div>
+                
+                <!-- 中款 -->
+                <div style="position: absolute; top: {st.session_state.mid_y}px; left: {st.session_state.mid_x}px; font-size: {st.session_state.font_mid}px; white-space: nowrap; font-weight: bold; letter-spacing: 8px;">
+                    {middle_text}
+                </div>
+                
+                <!-- 下款單位 -->
+                <div style="position: absolute; top: {st.session_state.comp_y}px; left: {st.session_state.comp_x}px; font-size: {st.session_state.font_comp}px; white-space: nowrap; font-weight: bold;">
+                    {company_name}
+                </div>
 
-            <!-- 敬輓 / 敬賀 -->
-            <div style="position: absolute; top: {st.session_state.suff_y}px; left: {st.session_state.suff_x}px; font-size: {st.session_state.font_suff}px; white-space: nowrap; font-weight: bold;">
-                {suffix_text}
+                <!-- 下款名字 (5人) -->
+                <div style="position: absolute; top: {st.session_state.name_y}px; left: {st.session_state.name_x}px; font-size: {st.session_state.font_name}px; white-space: nowrap; font-weight: bold;">
+                    {names_combined}
+                </div>
+
+                <!-- 敬輓 / 敬賀 -->
+                <div style="position: absolute; top: {st.session_state.suff_y}px; left: {st.session_state.suff_x}px; font-size: {st.session_state.font_suff}px; white-space: nowrap; font-weight: bold;">
+                    {suffix_text}
+                </div>
             </div>
-        </div>
-        """
+            """
 
-        # 透過 st.components.v1.html 渲染，完美呈現 A4 卡片預覽
-        components.html(layout_html, height=960, scrolling=False)
+        # 透過 st.components.v1.html 渲染預覽
+        components.html(layout_html, height=950, scrolling=False)
 
     # ---------------------------------------------------------
     # TAB 2: 現有賀卡與輓聯清單管理
@@ -390,5 +436,4 @@ else:
         else:  
             st.info(
                 "目前雲端賀卡表中尚無資料，請至第一頁新增卡片或檢查 Google 試算表連線。"
-            )
             )
