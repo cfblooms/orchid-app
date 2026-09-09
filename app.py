@@ -818,374 +818,202 @@ else:
                     del_submitted = st.form_submit_button("確認刪除此訂單")
                     if del_submitted:
                         if delete_data("訂單表", selected_del_id):
-                            st.success(f"已成功刪除訂單：{selected_del_id}")
+                            st.success(f"已成功刪除訂單編號：{selected_del_id}")
                             st.rerun()
-
-            st.markdown("---")
-            st.subheader("📄 未結訂單對帳單與列印")
-            cols = df_order.columns.tolist()
-            pay_col = "付款狀態" if "付款狀態" in cols else cols[-1]
-            cust_col = (
-                "訂購人 / 批發商名稱"
-                if "訂購人 / 批發商名稱" in cols
-                else (cols[2] if len(cols) > 2 else cols[1])
-            )
-            amt_col = None
-            for c in cols:
-                if "金額" in c or "售價" in c:
-                    amt_col = c
-                    break
-
-            df_unpaid = df_order[df_order[pay_col] == "未結"]
-            if not df_unpaid.empty:
-                unpaid_customers = df_unpaid[cust_col].unique().tolist()
-                selected_statement_cust = st.selectbox(
-                    "🔍 選擇要列印未結對帳單的訂購人 / 批發商名稱", unpaid_customers
-                )
-
-                cust_unpaid_df = df_unpaid[df_unpaid[cust_col] == selected_statement_cust]
-
-                st.markdown(f"#### 📋 【{selected_statement_cust}】未結訂單明細")
-                st.dataframe(cust_unpaid_df, use_container_width=True)
-
-                total_unpaid_amount = 0
-                if amt_col:
-                    total_unpaid_amount = pd.to_numeric(
-                        cust_unpaid_df[amt_col], errors="coerce"
-                    ).sum()
-                    st.info(
-                        f"💰 **{selected_statement_cust}** 目前累積未結總金額：**{total_unpaid_amount:,.0f} 元**"
-                    )
-
-                print_html = f"""
-                    <style>
-                    .statement-box {{
-                        width: 210mm;
-                        padding: 20mm;
-                        margin: 20px auto;
-                        background: white;
-                        border: 2px dashed #999;
-                        font-family: "DFKai-SB", "BiauKai", "標楷體", serif;
-                        color: #000;
-                        box-sizing: border-box;
-                        box-shadow: 0 0 10px rgba(0,0,0,0.1);
-                    }}
-                    .statement-title {{ text-align: center; font-size: 26px; font-weight: bold; margin-bottom: 25px; letter-spacing: 2px; }}
-                    .statement-info {{ display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 16px; }}
-                    .statement-table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; }}
-                    .statement-table th, .statement-table td {{ border: 1.5px solid #000; padding: 10px 12px; font-size: 15px; text-align: left; }}
-                    .statement-table th {{ background-color: #f0f0f0; }}
-                    .statement-footer {{ text-align: right; font-size: 18px; font-weight: bold; margin-top: 20px; letter-spacing: 1px; }}
-                    @media print {{
-                        @page {{ size: A4 portrait; margin: 10mm; }}
-                        body * {{ visibility: hidden; }}
-                        .statement-box, .statement-box * {{ visibility: visible; }}
-                        .statement-box {{ position: absolute; left: 0; top: 0; border: none; width: 100%; margin: 0; padding: 10mm; box-shadow: none; }}
-                    }}
-                    </style>
-                    <div class="statement-box">
-                        <div class="statement-title">🌸 蘭花業務未結款項對帳單 🌸</div>
-                        <div class="statement-info">
-                            <div><strong>客戶 / 批發商名稱：</strong> {selected_statement_cust}</div>
-                            <div><strong>製表日期：</strong> {datetime.date.today().strftime('%Y-%m-%d')}</div>
-                        </div>
-                        <table class="statement-table">
-                            <thead>
-                                <tr>
-                                    <th>訂單編號</th>
-                                    <th>品項與規格</th>
-                                    <th>下單日期</th>
-                                    <th>預計出貨</th>
-                                    <th>金額 (元)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                """
-                for _, r in cust_unpaid_df.iterrows():
-                    o_id = r.get("訂單編號", r.get(cols[0], "---"))
-                    o_spec = r.get("品項規格", r.get(cols[3] if len(cols) > 3 else cols[1], "---"))
-                    o_date = r.get("下單日期", r.get(cols[9] if len(cols) > 9 else "", "---"))
-                    exp_date = r.get("預計出貨日期", r.get(cols[10] if len(cols) > 10 else "", "---"))
-                    amt = r.get(amt_col, 0) if amt_col else 0
-
-                    print_html += f"""
-                                <tr>
-                                    <td>{o_id}</td>
-                                    <td>{o_spec}</td>
-                                    <td>{o_date}</td>
-                                    <td>{exp_date}</td>
-                                    <td>{amt}</td>
-                                </tr>
-                            """
-
-                print_html += f"""
-                            </tbody>
-                        </table>
-                        <div class="statement-footer">
-                            未結總計金額： NT$ {total_unpaid_amount:,.0f} 元
-                        </div>
-                    </div>
-                """
-                st.markdown(print_html, unsafe_allow_html=True)
-                st.info("💡 列印提示：請按下 **Ctrl + P**，即可將上方預覽的「未結對帳單」列印輸出！")
-            else:
-                st.success("🎉 目前所有訂單皆已結清，沒有未結訂單！")
         else:
             st.info("目前尚無訂單資料。")
 
     # -----------------------------------------
-    # TAB 6: A4 輓聯與卡片產生器 (已修復並補齊)
+    # TAB 6: A4 輓聯與卡片 (升級版)
     # -----------------------------------------
     with tab6:
-        st.header("🖨️ A4 輓聯與喜慶賀卡產生器")
+        st.header("🖨️ 6. A4 輓聯與開幕賀卡排版系統")
+        st.markdown("在此可製作標準 A4 尺寸的輓聯或開幕卡片，支援直式、橫式排版與完整預設詞庫選項。")
 
-        card_mode = st.selectbox(
-            "選擇卡片類型",
-            [
-                "喪禮傳統輓聯 (直式 / 橫式)",
-                "喜慶 / 開幕賀卡 (橫式花牌風格)",
-            ],
+        card_purpose = st.radio(
+            "卡片類型選擇", ["輓聯 (喪禮/悼念)", "慶/開幕 (賀卡/開幕)"], horizontal=True
+        )
+        layout_style = st.radio(
+            "排版方向選擇", ["直式 (傳統直排)", "橫式 (標準橫排)"], horizontal=True
         )
 
-        if card_mode == "喪禮傳統輓聯 (直式 / 橫式)":
-            orientation = st.radio(
-                "選擇輓聯列印方向", ["A4 直式排版", "A4 橫式排版"], horizontal=True
-            )
+        st.markdown("---")
 
-            with st.expander("✍️ 1. 輸入輓聯各區塊文字內容", expanded=True):
-                col_t1, col_t2, col_t3 = st.columns(3)
-                with col_t1:
-                    st.markdown("**【上款 / 受者設定】**")
-                    upper_text = st.text_input(
-                        "右側/上方受者文字", value="敬悼 佛弟子林文姬居士蓮前"
-                    )
-                with col_t2:
-                    st.markdown("**【中款 / 輓辭設定】**")
-                    mid_text = st.text_input("中間輓辭文字", value="往生極樂")
-                with col_t3:
-                    st.markdown("**【下款 / 署名與敬挽設定】**")
-                    sender_company = st.text_input("機關 / 單位名稱", value="桃園市議員")
-                    sender_name = st.text_input("落款大名", value="李宗豪")
-                    kwan_text = st.text_input("敬輓字樣", value="敬輓")
+        if card_purpose == "輓聯 (喪禮/悼念)":
+            st.subheader("🕊️ 輓聯細節設定")
 
-            with st.expander("⚙️ 2. 自由調整字體大小與位置微調", expanded=False):
-                f_col1, f_col2, f_col3, f_col4 = st.columns(4)
-                with f_col1:
-                    sz_upper = st.slider("上款字體大小", 20, 80, 42)
-                with f_col2:
-                    sz_mid = st.slider("中款字體大小", 50, 180, 105)
-                with f_col3:
-                    sz_lower = st.slider("下款/姓名字體大小", 20, 80, 42)
-                with f_col4:
-                    sz_kwan = st.slider("敬輓字體大小", 20, 80, 38)
-
-                st.markdown("---")
-                p_col1, p_col2, p_col3 = st.columns(3)
-                with p_col1:
-                    pos_right_offset = st.slider(
-                        "右側欄位上下平移", -100, 100, 0, key="p_r"
+            col_g1, col_g2 = st.columns(2)
+            with col_g1:
+                funeral_gender = st.selectbox("逝者性別", ["男", "女"])
+            with col_g2:
+                if funeral_gender == "女":
+                    age_category = st.selectbox(
+                        "女逝者年齡/身份別 (選取後自動對應中款選項)",
+                        [
+                            "少女、年輕女性 (49歲以下 / 未婚)",
+                            "中壯年女性 (50至79歲)",
+                            "高齡女性 (80歲以上)",
+                            "自訂中款",
+                        ],
                     )
-                    pos_right_x = st.slider(
-                        "右側欄位左右平移", -100, 100, 0, key="px_r"
-                    )
-                with p_col2:
-                    pos_mid_offset = st.slider(
-                        "中間欄位上下平移", -100, 100, 0, key="p_m"
-                    )
-                    pos_mid_x = st.slider(
-                        "中間欄位左右平移", -100, 100, 0, key="px_m"
-                    )
-                with p_col3:
-                    pos_left_offset = st.slider(
-                        "左側欄位上下平移", -100, 100, 0, key="p_l"
-                    )
-                    pos_left_x = st.slider(
-                        "左側欄位左右平移", -100, 100, 0, key="px_l"
+                else:
+                    age_category = st.selectbox(
+                        "男逝者年齡/身份別 (選取後自動對應中款選項)",
+                        [
+                            "49歲以下 (年輕、早逝)",
+                            "50至69歲 (壯年至中老年)",
+                            "70至79歲 (古稀)",
+                            "80歲以上 (高壽、期頤)",
+                            "自訂中款",
+                        ],
                     )
 
-            st.markdown("---")
-
-            if orientation == "A4 直式排版":
-                a4_html = f"""
-                    <style>
-                    .a4-portrait {{
-                        width: 210mm;
-                        height: 297mm;
-                        padding: 20mm 15mm;
-                        margin: auto;
-                        border: 2px dashed #bbb;
-                        background: white;
-                        font-family: "DFKai-SB", "BiauKai", "標楷體", "KaiTi", serif;
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: flex-start;
-                        box-sizing: border-box;
-                        box-shadow: 0 0 15px rgba(0,0,0,0.1);
-                        color: #000;
-                    }}
-                    .col-right {{
-                        writing-mode: vertical-rl;
-                        font-size: {sz_upper}px;
-                        letter-spacing: 4px;
-                        height: 90%;
-                        display: flex;
-                        align-items: flex-start;
-                        position: relative;
-                        top: {pos_right_offset}px;
-                        right: {pos_right_x}px;
-                    }}
-                    .col-center {{
-                        writing-mode: vertical-rl;
-                        font-size: {sz_mid}px;
-                        letter-spacing: 12px;
-                        height: 90%;
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        font-weight: bold;
-                        position: relative;
-                        top: {pos_mid_offset}px;
-                        left: {pos_mid_x}px;
-                    }}
-                    .col-left-group {{
-                        height: 90%;
-                        display: flex;
-                        flex-direction: column;
-                        justify-content: space-between;
-                        align-items: flex-end;
-                        position: relative;
-                        top: {pos_left_offset}px;
-                        left: {pos_left_x}px;
-                    }}
-                    .col-bottom-left-stack {{
-                        writing-mode: horizontal-tb;
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                    }}
-                    .col-lower {{
-                        writing-mode: vertical-rl;
-                        font-size: {sz_lower}px;
-                        letter-spacing: 4px;
-                    }}
-                    .col-kwan {{
-                        writing-mode: vertical-rl;
-                        font-size: {sz_kwan}px;
-                        letter-spacing: 4px;
-                    }}
-                    @media print {{
-                        @page {{ size: A4 portrait; margin: 0; }}
-                        body * {{ visibility: hidden; }}
-                        .a4-portrait, .a4-portrait * {{ visibility: visible; }}
-                        .a4-portrait {{ position: absolute; left: 0; top: 0; border: none; box-shadow: none; margin: 0; }}
-                    }}
-                    </style>
-                    <div class="a4-portrait">
-                        <div class="col-left-group">
-                            <div></div>
-                            <div class="col-bottom-left-stack">
-                                <div class="col-lower">{sender_company} {sender_name}</div>
-                                <div class="col-kwan" style="margin-top: 10px;">{kwan_text}</div>
-                            </div>
-                        </div>
-                        <div class="col-center">{mid_text}</div>
-                        <div class="col-right">{upper_text}</div>
-                    </div>
-                """
-                st.markdown(a4_html, unsafe_allow_html=True)
-                st.info("💡 列印提示：請按下 **Ctrl + P**，並將列印設定選取「直式 (Portrait)」、取消頁首頁尾，即可印出精準排版的傳統直式輓聯！")
-
+            # 對應中款選項清單
+            if funeral_gender == "女":
+                if "49歲以下" in age_category:
+                    mid_options = [
+                        "遽促芳齡",
+                        "玉殞香消",
+                        "芳華早謝",
+                        "蘭摧蕙折",
+                        "妝台月冷",
+                    ]
+                elif "50至79" in age_category:
+                    mid_options = [
+                        "淑德永昭",
+                        "懿範長存",
+                        "慈容永念",
+                        "德業長昭",
+                        "巾幗模範",
+                    ]
+                elif "80歲以上" in age_category:
+                    mid_options = [
+                        "萱範長存",
+                        "母儀千古",
+                        "駕返瑤池",
+                        "萱蔭長留",
+                        "壺範垂型",
+                    ]
+                else:
+                    mid_options = ["自訂"]
             else:
-                a4_landscape_html = f"""
-                    <style>
-                    .a4-landscape {{
-                        width: 297mm;
-                        height: 210mm;
-                        padding: 15mm 20mm;
-                        margin: auto;
-                        border: 2px dashed #bbb;
-                        background: white;
-                        font-family: "DFKai-SB", "BiauKai", "標楷體", "KaiTi", serif;
-                        display: flex;
-                        flex-direction: column;
-                        justify-content: space-between;
-                        box-sizing: border-box;
-                        box-shadow: 0 0 15px rgba(0,0,0,0.1);
-                        color: #000;
-                    }}
-                    .land-top {{
-                        font-size: {sz_upper}px;
-                        text-align: center;
-                        letter-spacing: 2px;
-                    }}
-                    .land-center {{
-                        font-size: {sz_mid}px;
-                        text-align: center;
-                        font-weight: bold;
-                        letter-spacing: 6px;
-                    }}
-                    .land-bottom {{
-                        font-size: {sz_lower}px;
-                        text-align: right;
-                        letter-spacing: 2px;
-                    }}
-                    @media print {{
-                        @page {{ size: A4 landscape; margin: 0; }}
-                        body * {{ visibility: hidden; }}
-                        .a4-landscape, .a4-landscape * {{ visibility: visible; }}
-                        .a4-landscape {{ position: absolute; left: 0; top: 0; border: none; box-shadow: none; margin: 0; }}
-                    }}
-                    </style>
-                    <div class="a4-landscape">
-                        <div class="land-top">{upper_text}</div>
-                        <div class="land-center">{mid_text}</div>
-                        <div class="land-bottom">{sender_company} {sender_name} {kwan_text}</div>
-                    </div>
-                """
-                st.markdown(a4_landscape_html, unsafe_allow_html=True)
-                st.info("💡 列印提示：請按下 **Ctrl + P**，並將列印設定選取「橫式 (Landscape)」、取消頁首頁尾，即可印出橫式輓聯！")
+                if "49歲以下" in age_category:
+                    mid_options = [
+                        "星隕少微",
+                        "玉樹長埋",
+                        "壯志未酬",
+                        "天不假年",
+                        "長才未盡",
+                        "玉折蘭摧",
+                    ]
+                elif "50至69" in age_category:
+                    mid_options = [
+                        "棟折梁摧",
+                        "典則空留",
+                        "英氣頓杳",
+                        "德望昭然",
+                        "風範長存",
+                    ]
+                elif "70至79" in age_category:
+                    mid_options = [
+                        "哲人其萎",
+                        "斗柄西移",
+                        "德業長昭",
+                        "典范長存",
+                    ]
+                elif "80歲以上" in age_category:
+                    mid_options = [
+                        "德高望重",
+                        "魯般圮毀",
+                        "仁者壽",
+                        "德望永昭",
+                    ]
+                else:
+                    mid_options = ["自訂"]
+
+            col_u1, col_u2 = st.columns(2)
+            with col_u1:
+                default_upper = (
+                    "敬悼 X公X先生 千古"
+                    if funeral_gender == "男"
+                    else "敬悼 X媽X夫人 仙逝"
+                )
+                upper_text = st.text_input(
+                    "【右側上款】 (例如: 敬悼 X公X先生 千古 / 敬悼 X媽X夫人 仙逝)", value=default_upper
+                )
+            with col_u2:
+                if "自訂" in mid_options or mid_options == ["自訂"]:
+                    middle_text = st.text_input(
+                        "【中間中款】輓辭 (可自行打字)", value=""
+                    )
+                else:
+                    sel_mid = st.selectbox("選擇預設中款輓辭", mid_options)
+                    middle_text = st.text_input(
+                        "【中間中款】輓辭 (可選擇或直接修改)", value=sel_mid
+                    )
+
+            col_l1, col_l2, col_l3 = st.columns(3)
+            with col_l1:
+                lower_company = st.text_input("【下款】公司/單位名稱 (選填)", value="")
+            with col_l2:
+                lower_name = st.text_input("【下款】名字位置", value="某某某")
+            with col_l3:
+                lower_suffix = st.selectbox("【左下角】署名結尾", ["敬輓", "泣輓", "泐輓"])
+
+            if lower_company:
+                lower_text = f"{lower_company} {lower_name} {lower_suffix}"
+            else:
+                lower_text = f"{lower_name} {lower_suffix}"
 
         else:
-            # 喜慶 / 開幕賀卡模式
-            st.markdown("### 🌸 喜慶 / 開幕賀卡設定")
-            c_top = st.text_input("賀詞標題 (例如: 祝 鴻圖大展)", value="祝 鴻圖大展")
-            c_mid = st.text_input("主要賀詞內容 (例如: 業務蒸蒸日上 生意興隆)", value="業務蒸蒸日上 生意興隆")
-            c_bot = st.text_input("署名 / 送花人 (例如: 好友 張小明 敬賀)", value="好友 張小明 敬賀")
+            st.subheader("🎉 慶祝 / 開幕賀卡細節設定")
+            col_c1, col_c2 = st.columns(2)
+            with col_c1:
+                upper_text = st.text_input(
+                    "【上款】祝賀對象", value="恭祝 鴻海科技集團 新廠落成"
+                )
+                opening_mids = [
+                    "鴻圖大展",
+                    "駿業宏開",
+                    "生意興隆",
+                    "財源廣進",
+                    "大業千秋",
+                ]
+                sel_op_mid = st.selectbox("選擇預設開幕賀詞", opening_mids)
+                middle_text = st.text_input(
+                    "【中款】賀詞內容 (可直接修改)", value=sel_op_mid
+                )
+            with col_c2:
+                lower_company = st.text_input("【下款】公司/單位名稱", value="大吉花店")
+                lower_suffix = st.selectbox("【下款】敬獻方式", ["敬賀", "敬獻"])
+                lower_text = f"{lower_company} {lower_suffix}"
 
-            card_html = f"""
-                <style>
-                .card-box {{
-                    width: 297mm;
-                    height: 210mm;
-                    padding: 25mm;
-                    margin: auto;
-                    border: 3px solid #d4af37;
-                    background: #fffdfa;
-                    font-family: "DFKai-SB", "BiauKai", "標楷體", serif;
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: space-around;
-                    align-items: center;
-                    box-sizing: border-box;
-                    box-shadow: 0 0 15px rgba(0,0,0,0.15);
-                    color: #8b0000;
-                    text-align: center;
-                }}
-                .card-title {{ font-size: 50px; font-weight: bold; letter-spacing: 4px; }}
-                .card-content {{ font-size: 65px; font-weight: bold; letter-spacing: 6px; color: #000; }}
-                .card-footer {{ font-size: 40px; font-weight: bold; letter-spacing: 2px; align-self: flex-end; }}
-                @media print {{
-                    @page {{ size: A4 landscape; margin: 0; }}
-                    body * {{ visibility: hidden; }}
-                    .card-box, .card-box * {{ visibility: visible; }}
-                    .card-box {{ position: absolute; left: 0; top: 0; border: none; width: 100%; height: 100%; margin: 0; padding: 20mm; box-shadow: none; }}
-                }}
-                </style>
-                <div class="card-box">
-                    <div class="card-title">{c_top}</div>
-                    <div class="card-content">{c_mid}</div>
-                    <div class="card-footer">{c_bot}</div>
+        generate_btn = st.button("🖨️ 產生 A4 列印預覽")
+
+        if generate_btn:
+            st.markdown("---")
+            st.subheader("🖨️ A4 排版預覽效果")
+
+            if "直式" in layout_style:
+                # 直式排版 (傳統直書，右至左排列)
+                card_html = f"""
+                <div style="border: 2px dashed #bbb; padding: 40px; width: 100%; max-width: 650px; height: 550px; margin: 0 auto; background-color: #fff; color: #000; font-family: 'DFKai-SB', 'BiauKai', 'Microsoft JhengHei', serif; display: flex; justify-content: space-around; align-items: center; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 5px;">
+                    <div style="font-size: 20px; font-weight: bold; margin-top: 20px;">{lower_text}</div>
+                    <div style="font-size: 32px; font-weight: bold; margin: 0 25px;">{middle_text}</div>
+                    <div style="font-size: 20px; font-weight: bold; margin-bottom: 20px;">{upper_text}</div>
                 </div>
-            """
+                """
+            else:
+                # 橫式排版
+                card_html = f"""
+                <div style="border: 2px dashed #bbb; padding: 40px; width: 100%; max-width: 700px; margin: 0 auto; background-color: #fff; color: #000; font-family: 'DFKai-SB', 'BiauKai', 'Microsoft JhengHei', sans-serif; text-align: center;">
+                    <h3 style="letter-spacing: 5px; margin-bottom: 20px;">{upper_text}</h3>
+                    <hr style="width: 50%; margin: 20px auto;">
+                    <h1 style="font-size: 34px; letter-spacing: 8px; margin: 40px 0; line-height: 1.5;">{middle_text}</h1>
+                    <hr style="width: 50%; margin: 20px auto;">
+                    <h3 style="letter-spacing: 5px; margin-top: 30px; text-align: right; padding-right: 50px;">{lower_text}</h3>
+                </div>
+                """
+
             st.markdown(card_html, unsafe_allow_html=True)
-            st.info("💡 提示：按下 **Ctrl + P**（橫式 Landscape）即可將此喜慶花牌賀卡列印出來！")
+            st.info("💡 提示：您可以直接按下瀏覽器的列印快速鍵（Ctrl + P 或 Cmd + P），即可將此畫面輸出為 A4 實體輓聯或賀卡。")
