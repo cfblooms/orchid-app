@@ -1,5 +1,6 @@
 import datetime
 import streamlit as st
+import streamlit.components.v1 as components
 from utils import (
     WEB_APP_URL,
     get_data,
@@ -65,8 +66,15 @@ else:
                     )
             with col_o3:
                 card_type = st.selectbox(
-                    "卡片類型", ["喪禮（輓聯）", "慶賀／開幕"]
+                    "卡片類型", ["喪禮（輓聯）", "慶賀-開幕", "慶賀-搬家", "慶賀-宮廟"]
                 )
+
+            col_o4, col_o5 = st.columns(2)
+            with col_o4:
+                recipient_name = st.text_input(
+                    "收花人 / 逝者姓名", value="王小明先生 / 某某公司"
+                )
+            with col_o5:
                 orientation = st.selectbox("版面方向", ["直式", "橫式"])
 
             st.markdown("---")
@@ -76,44 +84,58 @@ else:
                 st.subheader("一、上款與對象設定")
                 if card_type == "喪禮（輓聯）":
                     mourn_template = st.selectbox(
-                        "敬悼格式選擇",
+                        "格式選擇",
                         [
-                            "敬悼 X 媽X夫人 仙逝",
-                            "敬悼 X 媽X老夫人 仙逝",
-                            "敬悼 X公X先生 千古",
-                            "敬悼 X公X老先生 千古",
+                            "X 媽X老夫人",
+                            "X 媽X夫人",
+                            "X公X老先生",
+                            "X公X先生",
+                            "X女士",
+                            "X先生",
                             "自訂上款",
                         ],
                     )
                     if mourn_template == "自訂上款":
                         upper_text = st.text_input(
-                            "輸入自訂上款", "敬悼 佛弟子林文姬居士蓮前"
+                            "輸入自訂上款", "佛弟子林文姬居士蓮前"
                         )
                     else:
                         custom_name = st.text_input(
                             "填入姓氏或全名（取代範本中的 X）", "林"
                         )
-                        if "媽X夫人" in mourn_template:
-                            upper_text = (
-                                f"敬悼 {custom_name} 媽{custom_name}夫人仙逝"
-                            )
-                        elif "媽X老夫人" in mourn_template:
-                            upper_text = f"敬悼 {custom_name} 媽{custom_name}老夫人仙逝"
-                        elif "X公X先生" in mourn_template:
-                            upper_text = f"敬悼 {custom_name}公{custom_name}先生千古"
+                        if mourn_template == "X 媽X老夫人":
+                            base_title = f"{custom_name} 媽{custom_name}老夫人"
+                        elif mourn_template == "X 媽X夫人":
+                            base_title = f"{custom_name} 媽{custom_name}夫人"
+                        elif mourn_template == "X公X老先生":
+                            base_title = f"{custom_name}公{custom_name}老先生"
+                        elif mourn_template == "X公X先生":
+                            base_title = f"{custom_name}公{custom_name}先生"
+                        elif mourn_template == "X女士":
+                            base_title = f"{custom_name}女士"
                         else:
-                            upper_text = f"敬悼 {custom_name}公{custom_name}老先生千古"
+                            base_title = f"{custom_name}先生"
+
+                        ending_choice = st.selectbox(
+                            "上款結尾敬語",
+                            ["仙逝", "千古", "靈前", "冥前", "便覽", "淑靈", "蓮前", "自訂"]
+                        )
+                        ending_text = (
+                            ending_choice
+                            if ending_choice != "自訂"
+                            else st.text_input("輸入自訂結尾詞", "仙逝")
+                        )
+                        upper_text = f"{base_title} {ending_text}"
                 else:
-                    upper_text = st.text_input(
-                        "上款（祝賀對象）", "恭祝 某某公司開幕誌慶"
-                    )
+                    # 慶賀類（開幕、搬家、宮廟）
+                    upper_prefix = st.selectbox("上款格式選擇", ["恭祝", "恭賀"])
+                    default_target = "某某公司開幕誌慶" if "開幕" in card_type else ("某某府喬遷之喜" if "搬家" in card_type else "某某宮神威顯赫")
+                    upper_target = st.text_input("上款主旨內容", default_target)
+                    upper_text = f"{upper_prefix} {upper_target}"
 
                 deliver_location = st.text_input(
-                    "配送地點 / 靈堂名稱",
+                    "配送地點",
                     value="第一殯儀館明德廳 / 某某商辦大樓",
-                )
-                recipient_name = st.text_input(
-                    "收花人 / 逝者姓名", value="某某某 先生/女士"
                 )
 
             with col_s2:
@@ -122,41 +144,41 @@ else:
                     gender = st.radio("性別", ["女", "男"], horizontal=True)
                     if gender == "女":
                         female_age = st.selectbox(
-                            "女性年齡／身份",
+                            "女性身份與年齡",
                             [
-                                "少女、年輕女性（約 49 歲以下 / 未婚）",
-                                "中壯年女性（約 50 至 79 歲）",
-                                "高齡女性（80 歲以上）",
+                                "49歲以下（年輕、未婚或一般年輕女性，稱女士）",
+                                "50至79歲（稱夫人／女士）",
+                                "80歲以上（稱老夫人）",
                                 "自訂中款",
                             ],
                         )
-                        if "少女" in female_age:
-                            middle_options = ["遽促芳齡", "玉殞香消", "芳華早謝", "蘭摧蕙折"]
-                        elif "中壯年" in female_age:
-                            middle_options = ["淑德永昭", "懿範長存", "慈容永念", "德業長昭"]
-                        elif "高齡" in female_age:
-                            middle_options = ["萱範長存", "母儀千古", "駕返瑤池", "萱蔭長留"]
+                        if "49歲以下" in female_age:
+                            middle_options = ["芳華早謝", "遽促芳齡", "妝台月冷", "香消玉殞", "音容宛在"]
+                        elif "50至79歲" in female_age:
+                            middle_options = ["懿範長存", "淑德永昭", "萱萎北堂", "慈雲縹緲"]
+                        elif "80歲以上" in female_age:
+                            middle_options = ["母儀千古", "駕返瑤池", "慈輝永昭", "寶婺星沉"]
                         else:
                             middle_options = []
                     else:
                         male_age = st.selectbox(
-                            "男性年齡／身份",
+                            "男性身份與年齡",
                             [
-                                "49歲以下（年輕、早逝）",
-                                "50至69歲（壯年至中老年）",
-                                "70歲至79歲（古稀）",
-                                "80歲以上（高壽、期頤）",
+                                "49歲以下（稱「先生」）",
+                                "50至69歲（稱「先生」）",
+                                "70至79歲（稱「老先生」）",
+                                "80歲以上（稱「老先生」）",
                                 "自訂中款",
                             ],
                         )
                         if "49歲以下" in male_age:
-                            middle_options = ["星隕少微", "玉樹長埋", "壯志未酬", "天不假年"]
+                            middle_options = ["星隕少微", "壯志未酬", "天不假年", "英年仙去", "音容宛在"]
                         elif "50至69歲" in male_age:
-                            middle_options = ["棟折梁摧", "典則空留", "英氣頓杳", "德望昭然"]
-                        elif "70歲至79歲" in male_age:
-                            middle_options = ["哲人其萎", "斗柄西移", "德業長昭", "典範長存"]
+                            middle_options = ["長才未盡", "棟折梁摧", "典則空留", "悵望音容", "英氣頓杳"]
+                        elif "70至79歲" in male_age:
+                            middle_options = ["駕鶴西歸", "道範長存", "碩德堪欽", "儀型足式", "高風亮節"]
                         elif "80歲以上" in male_age:
-                            middle_options = ["德高望重", "魯般圮毀", "仁者壽", "德望永昭"]
+                            middle_options = ["福壽全歸", "高山仰止", "碩德貽徽", "德望永昭", "典範長存"]
                         else:
                             middle_options = []
 
@@ -172,20 +194,36 @@ else:
                     else:
                         middle_text = st.text_input("輸入自訂中款", "往生極樂")
                 else:
-                    celeb_options = [
-                        "鴻圖大展",
-                        "駿業宏開",
-                        "生意興隆",
-                        "財源廣進",
-                        "大業千秋",
-                        "自訂輸入",
-                    ]
+                    # 慶賀類（無需選擇身份）
+                    if card_type == "慶賀-開幕":
+                        celeb_options = [
+                            "開幕誌慶",
+                            "開張大吉",
+                            "鴻圖大展",
+                            "駿業宏開",
+                            "生意興隆",
+                            "財源廣進",
+                            "客似雲來",
+                        ]
+                    elif card_type == "慶賀-搬家":
+                        celeb_options = [
+                            "喬遷之喜",
+                            "里仁為美",
+                            "金玉滿堂",
+                        ]
+                    elif card_type == "慶賀-宮廟":
+                        celeb_options = [
+                            "聖誕千秋・神威顯赫",
+                        ]
+                    else:
+                        celeb_options = ["鴻圖大展"]
+
                     selected_celeb = st.selectbox(
-                        "選擇慶賀常用詞", celeb_options
+                        "選擇常用中款詞語", celeb_options + ["自行輸入"]
                     )
                     middle_text = (
-                        st.text_input("輸入自訂慶賀詞", "鴻圖大展")
-                        if selected_celeb == "自訂輸入"
+                        st.text_input("輸入自訂中款", celeb_options[0] if celeb_options else "鴻圖大展")
+                        if selected_celeb == "自行輸入"
                         else selected_celeb
                     )
 
@@ -231,7 +269,7 @@ else:
                     card_id,
                     selected_order_id,
                     card_type,
-                    recipient_name,
+                    recipient_name, # 帶入收花人 / 逝者姓名
                     middle_text,
                     upper_text,
                     lower_text_db,
@@ -318,7 +356,8 @@ else:
         </div>
         """
 
-        st.markdown(layout_html, unsafe_allow_html=True)
+        # 透過 st.components.v1.html 渲染，完美呈現 A4 卡片預覽
+        components.html(layout_html, height=960, scrolling=False)
 
     # ---------------------------------------------------------
     # TAB 2: 現有賀卡與輓聯清單管理
