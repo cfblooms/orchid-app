@@ -106,7 +106,7 @@ else:
   )
 
   # -----------------------------------------
-  # TAB 1: 蘭花品種資料庫 (新增修改與刪除)
+  # TAB 1: 蘭花品種資料庫
   # -----------------------------------------
   with tab1:
     st.header("🌸 蘭花品種寫入與資料庫管理")
@@ -209,7 +209,7 @@ else:
       st.info("目前資料庫尚無品種資料。")
 
   # -----------------------------------------
-  # TAB 2: 客戶資料庫 (新增 Line 名稱、修改與刪除)
+  # TAB 2: 客戶資料庫
   # -----------------------------------------
   with tab2:
     st.header("👥 客戶資料庫管理 (批發商與花店)")
@@ -428,7 +428,7 @@ else:
       st.info("目前尚無進貨資料。")
 
   # -----------------------------------------
-  # TAB 4: 退貨管理區 (已刪除說明文字)
+  # TAB 4: 退貨管理區
   # -----------------------------------------
   with tab4:
     st.header("🔄 退貨與不良品管理區")
@@ -599,10 +599,10 @@ else:
       st.info("目前尚無退貨紀錄。")
 
   # -----------------------------------------
-  # TAB 5: 訂單與帳務管理 (含未結對帳單與列印)
+  # TAB 5: 訂單與帳務管理
   # -----------------------------------------
   with tab5:
-    st.header("💰 訂單登錄與帳務管理（支援已結 / 未結追蹤與對帳列印）")
+    st.header("💰 訂單登錄與帳務管理（支援單筆完整修改、結帳與對帳列印）")
 
     df_inv_check = get_data("進貨表")
     flower_list = []
@@ -696,29 +696,118 @@ else:
           st.rerun()
 
     st.markdown("---")
-    st.subheader("📋 訂單與帳務總覽 (狀態更新與刪除)")
+    st.subheader("📋 訂單總覽與修改 / 狀態更新 / 刪除")
     df_order = get_data("訂單表")
     if not df_order.empty:
       st.dataframe(df_order, use_container_width=True)
-      order_ids_list = df_order["訂單編號"].tolist()
+      order_ids_list = df_order["訂單編號"].astype(str).tolist()
 
       col_o1, col_o2 = st.columns(2)
       with col_o1:
-        st.subheader("📝 更新訂單狀態")
-        with st.form("update_status_form"):
-          selected_upd_id = st.selectbox("選擇要修改的訂單編號", order_ids_list)
-          new_shipped = st.selectbox("更新出貨狀態", ["未出貨", "已出貨"])
-          new_payment = st.selectbox("更新付款狀態", ["未結", "已結"])
-          update_submitted = st.form_submit_button("確認更新狀態")
+        st.subheader("📝 修改指定訂單內容與狀態")
+        selected_upd_id = st.selectbox(
+            "選擇要修改的訂單編號", order_ids_list, key="sel_ord_mod"
+        )
 
-          if update_submitted:
-            matched_row = df_order[df_order["訂單編號"] == selected_upd_id]
-            if not matched_row.empty:
-              r_list = matched_row.values.tolist()[0]
-              r_list[-2] = new_shipped
-              r_list[-1] = new_payment
-              if update_data("訂單表", selected_upd_id, r_list):
-                st.success(f"訂單 {selected_upd_id} 狀態已更新！")
+        matched_row = df_order[
+            df_order["訂單編號"].astype(str) == selected_upd_id
+        ]
+        if not matched_row.empty:
+          r_vals = matched_row.iloc[0].tolist()
+          # 取得原本的欄位值
+          o_cust_type = r_vals[1] if len(r_vals) > 1 else "個人"
+          o_customer = r_vals[2] if len(r_vals) > 2 else ""
+          o_spec = r_vals[3] if len(r_vals) > 3 else ""
+          o_pot = r_vals[4] if len(r_vals) > 4 else "無盆"
+          o_delivery = r_vals[5] if len(r_vals) > 5 else "自載"
+          o_term = r_vals[6] if len(r_vals) > 6 else "每單結"
+          o_cost = (
+              float(r_vals[7])
+              if len(r_vals) > 7
+              and str(r_vals[7]).replace(".", "", 1).isdigit()
+              else 0.0
+          )
+          o_price = (
+              float(r_vals[8])
+              if len(r_vals) > 8
+              and str(r_vals[8]).replace(".", "", 1).isdigit()
+              else 0.0
+          )
+
+          o_date_str = (
+              r_vals[9] if len(r_vals) > 9 else str(datetime.date.today())
+          )
+          o_exp_str = (
+              r_vals[10] if len(r_vals) > 10 else str(datetime.date.today())
+          )
+          o_shipped = r_vals[11] if len(r_vals) > 11 else "未出貨"
+          o_payment = r_vals[12] if len(r_vals) > 12 else "未結"
+
+          try:
+            p_o_date = datetime.datetime.strptime(o_date_str, "%Y-%m-%d").date()
+          except:
+            p_o_date = datetime.date.today()
+          try:
+            p_e_date = datetime.datetime.strptime(o_exp_str, "%Y-%m-%d").date()
+          except:
+            p_e_date = datetime.date.today()
+
+          cust_types = ["批發", "花店", "個人"]
+          d_ctype_idx = (
+              cust_types.index(o_cust_type) if o_cust_type in cust_types else 2
+          )
+          shipped_opts = ["未出貨", "已出貨"]
+          d_ship_idx = (
+              shipped_opts.index(o_shipped) if o_shipped in shipped_opts else 0
+          )
+          payment_opts = ["未結", "已結"]
+          d_pay_idx = (
+              payment_opts.index(o_payment) if o_payment in payment_opts else 0
+          )
+
+          with st.form("update_order_full_form"):
+            upd_c_type = st.selectbox(
+                "修改客戶類型", cust_types, index=d_ctype_idx
+            )
+            upd_customer = st.text_input("修改訂購人/批發商名稱", value=o_customer)
+            upd_spec = st.text_input("修改品項與規格", value=o_spec)
+            upd_pot = st.text_input("修改盆器", value=o_pot)
+            upd_delivery = st.text_input("修改配送方式", value=o_delivery)
+            upd_term = st.text_input("修改結帳方式", value=o_term)
+            upd_cost = st.number_input(
+                "修改預估總成本 (元)", min_value=0.0, value=o_cost
+            )
+            upd_price = st.number_input(
+                "修改售價/金額 (元)", min_value=0.0, value=o_price
+            )
+            upd_o_date = st.date_input("修改下單日期", value=p_o_date)
+            upd_e_date = st.date_input("修改預計出貨日期", value=p_e_date)
+            upd_shipped = st.selectbox(
+                "修改出貨狀態", shipped_opts, index=d_ship_idx
+            )
+            upd_payment = st.selectbox(
+                "修改付款狀態", payment_opts, index=d_pay_idx
+            )
+
+            submitted_upd_ord = st.form_submit_button("確認更新此訂單")
+            if submitted_upd_ord:
+              updated_row_data = [
+                  selected_upd_id,
+                  upd_c_type,
+                  upd_customer,
+                  upd_spec,
+                  upd_pot,
+                  upd_delivery,
+                  upd_term,
+                  float(upd_cost),
+                  float(upd_price),
+                  str(upd_o_date),
+                  str(upd_e_date),
+                  upd_shipped,
+                  upd_payment,
+              ]
+              if update_data("訂單表", selected_upd_id, updated_row_data):
+                st.success(f"訂單編號 {selected_upd_id} 修改成功（維持單筆更新）！")
                 st.rerun()
 
       with col_o2:
@@ -733,9 +822,6 @@ else:
               st.success(f"已成功刪除訂單：{selected_del_id}")
               st.rerun()
 
-      # -----------------------------------------
-      # 依訂購人/批發商名稱整理未結訂單並列印
-      # -----------------------------------------
       st.markdown("---")
       st.subheader("📄 未結訂單對帳單與列印")
       st.markdown(
@@ -871,45 +957,85 @@ else:
       st.info("目前尚無訂單資料。")
 
   # -----------------------------------------
-  # TAB 6: A4 輓聯與卡片產生器 (直式放前面、無背景風格選擇、無裝飾線)
+  # TAB 6: A4 輓聯與卡片產生器 (直式、橫式排版與位置精準微調)
   # -----------------------------------------
   with tab6:
     st.header("🖨️ A4 輓聯與喜慶賀卡產生器")
 
-    card_mode = st.selectbox("選擇卡片類型", ["喪禮傳統輓聯", "喜慶 / 開幕賀卡"])
+    card_mode = st.selectbox(
+        "選擇卡片類型",
+        [
+            "喪禮傳統輓聯 (直式 / 橫式)",
+            "喜慶 / 開幕賀卡 (橫式花牌風格)",
+        ],
+    )
 
-    if card_mode == "喪禮傳統輓聯":
+    if card_mode == "喪禮傳統輓聯 (直式 / 橫式)":
       orientation = st.radio(
           "選擇輓聯列印方向", ["A4 直式排版", "A4 橫式排版"], horizontal=True
       )
 
-      with st.expander("⚙️ 自由調整字體大小設定", expanded=True):
+      # -----------------------------------------
+      # 文字與內容輸入區
+      # -----------------------------------------
+      with st.expander("✍️ 1. 輸入輓聯各區塊文字內容", expanded=True):
+        col_t1, col_t2, col_t3 = st.columns(3)
+        with col_t1:
+          st.markdown("**【上款 / 受者設定】**")
+          upper_text = st.text_input(
+              "右側/上方受者文字", value="敬悼 佛弟子林文姬居士蓮前"
+          )
+        with col_t2:
+          st.markdown("**【中款 / 輓辭設定】**")
+          mid_text = st.text_input("中間輓辭文字", value="往生極樂")
+        with col_t3:
+          st.markdown("**【下款 / 署名與敬挽設定】**")
+          sender_company = st.text_input("機關 / 單位名稱", value="桃園市議員")
+          sender_name = st.text_input("落款大名", value="李宗豪")
+          kwan_text = st.text_input("敬輓字樣", value="敬輓")
+
+      # -----------------------------------------
+      # 字體大小與位置微調控制項
+      # -----------------------------------------
+      with st.expander("⚙️ 2. 自由調整字體大小與位置微調", expanded=False):
         f_col1, f_col2, f_col3, f_col4 = st.columns(4)
         with f_col1:
-          sz_upper = st.slider("上款字體大小", 30, 100, 50)
+          sz_upper = st.slider("上款字體大小", 20, 80, 42)
         with f_col2:
-          sz_mid = st.slider("中款字體大小", 60, 200, 120)
+          sz_mid = st.slider("中款字體大小", 50, 180, 105)
         with f_col3:
-          sz_lower = st.slider("下款/姓名字體大小", 30, 100, 50)
+          sz_lower = st.slider("下款/姓名字體大小", 20, 80, 42)
         with f_col4:
-          sz_kwan = st.slider("敬輓字體大小", 30, 100, 45)
+          sz_kwan = st.slider("敬輓字體大小", 20, 80, 38)
 
-      col_r, col_m, col_l = st.columns(3)
-      with col_r:
-        st.markdown("**【上款設定】**")
-        upper_text = st.text_input("輸入上款 (如: 敬悼)", value="敬悼")
-      with col_m:
-        st.markdown("**【中款 / 輓辭設定】**")
-        mid_text = st.text_input("輸入中款輓辭 (如: 上品上生)", value="上品上生")
-      with col_l:
-        st.markdown("**【下款與敬輓設定】**")
-        sender_company = st.text_input("機關/公司", value="臺北市政府")
-        sender_name = st.text_input("落款名字 (王大明)", value="王大明")
-        kwan_text = st.text_input("敬輓字樣", value="敬輓")
+        st.markdown("---")
+        p_col1, p_col2, p_col3 = st.columns(3)
+        with p_col1:
+          pos_right_offset = st.slider(
+              "右側欄位上下平移", -100, 100, 0, key="p_r"
+          )
+          pos_right_x = st.slider(
+              "右側欄位左右平移", -100, 100, 0, key="px_r"
+          )
+        with p_col2:
+          pos_mid_offset = st.slider(
+              "中間欄位上下平移", -100, 100, 0, key="p_m"
+          )
+          pos_mid_x = st.slider(
+              "中間欄位左右平移", -100, 100, 0, key="px_m"
+          )
+        with p_col3:
+          pos_left_offset = st.slider(
+              "左側欄位上下平移", -100, 100, 0, key="p_l"
+          )
+          pos_left_x = st.slider(
+              "左側欄位左右平移", -100, 100, 0, key="px_l"
+          )
 
       st.markdown("---")
 
       if orientation == "A4 直式排版":
+        # 直式排版：依照照片一右至左（右側受者、中間輓辭、左側署名）
         a4_html = f"""
                 <style>
                 .a4-portrait {{
@@ -927,18 +1053,53 @@ else:
                     box-shadow: 0 0 15px rgba(0,0,0,0.1);
                     color: #000;
                 }}
-                .col-right {{ writing-mode: vertical-rl; font-size: {sz_upper}px; letter-spacing: 4px; height: 90%; display: flex; align-items: flex-start; }}
-                .col-center {{ writing-mode: vertical-rl; font-size: {sz_mid}px; letter-spacing: 12px; height: 90%; display: flex; justify-content: center; align-items: center; font-weight: bold; }}
-                .col-left-group {{ height: 90%; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; }}
+                .col-right {{
+                    writing-mode: vertical-rl;
+                    font-size: {sz_upper}px;
+                    letter-spacing: 4px;
+                    height: 90%;
+                    display: flex;
+                    align-items: flex-start;
+                    position: relative;
+                    top: {pos_right_offset}px;
+                    right: {pos_right_x}px;
+                }}
+                .col-center {{
+                    writing-mode: vertical-rl;
+                    font-size: {sz_mid}px;
+                    letter-spacing: 12px;
+                    height: 90%;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    font-weight: bold;
+                    position: relative;
+                    top: {pos_mid_offset}px;
+                    left: {pos_mid_x}px;
+                }}
+                .col-left-group {{
+                    height: 90%;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+                    align-items: flex-end;
+                    position: relative;
+                    top: {pos_left_offset}px;
+                    left: {pos_left_x}px;
+                }}
                 .col-bottom-left-stack {{
                     writing-mode: horizontal-tb;
                     display: flex;
                     flex-direction: column;
                     align-items: center;
                 }}
-                .col-lower {{ writing-mode: vertical-rl; font-size: {sz_lower}px; letter-spacing: 4px; }}
+                .col-lower {{
+                    writing-mode: vertical-rl;
+                    font-size: {sz_lower}px;
+                    letter-spacing: 4px;
+                }}
                 @media print {{
-                    @page {{ size: A4 portrait; }}
+                    @page {{ size: A4 portrait; margin: 0; }}
                     body * {{ visibility: hidden; }}
                     .a4-portrait, .a4-portrait * {{ visibility: visible; }}
                     .a4-portrait {{ position: absolute; left: 0; top: 0; border: none; box-shadow: none; width: 210mm; height: 297mm; }}
@@ -957,6 +1118,7 @@ else:
                 </div>
                 """
       else:
+        # 橫式排版：依照照片二（上方受者、中間大字輓辭、下方單位與署名）
         a4_html = f"""
                 <style>
                 .a4-landscape {{
@@ -974,23 +1136,45 @@ else:
                     box-shadow: 0 0 15px rgba(0,0,0,0.1);
                     color: #000;
                 }}
-                .row-upper {{ font-size: {sz_upper}px; letter-spacing: 4px; text-align: left; }}
-                .row-center {{ font-size: {sz_mid}px; font-weight: bold; letter-spacing: 16px; text-align: center; margin: auto 0; }}
+                .row-upper {{
+                    font-size: {sz_upper}px;
+                    letter-spacing: 4px;
+                    text-align: center;
+                    position: relative;
+                    top: {pos_right_offset}px;
+                    left: {pos_right_x}px;
+                }}
+                .row-center {{
+                    font-size: {sz_mid}px;
+                    font-weight: bold;
+                    letter-spacing: 16px;
+                    text-align: center;
+                    margin: auto 0;
+                    position: relative;
+                    top: {pos_mid_offset}px;
+                    left: {pos_mid_x}px;
+                }}
                 .row-bottom-area {{
                     display: flex;
-                    justify-content: space-between;
-                    align-items: flex-end;
-                }}
-                .row-lower-left-group {{
-                    display: flex;
                     flex-direction: column;
+                    align-items: flex-end;
+                    position: relative;
+                    top: {pos_left_offset}px;
+                    right: {pos_left_x}px;
+                }}
+                .row-lower-company {{
+                    font-size: {sz_lower}px;
+                    letter-spacing: 4px;
+                    margin-bottom: 8px;
+                }}
+                .row-lower-name-group {{
+                    display: flex;
                     align-items: center;
                     font-size: {sz_lower}px;
                     letter-spacing: 4px;
                 }}
-                .row-lower-right {{ font-size: {sz_lower}px; letter-spacing: 4px; }}
                 @media print {{
-                    @page {{ size: A4 landscape; }}
+                    @page {{ size: A4 landscape; margin: 0; }}
                     body * {{ visibility: hidden; }}
                     .a4-landscape, .a4-landscape * {{ visibility: visible; }}
                     .a4-landscape {{ position: absolute; left: 0; top: 0; border: none; box-shadow: none; width: 297mm; height: 210mm; }}
@@ -1000,11 +1184,11 @@ else:
                     <div class="row-upper"><span>{upper_text}</span></div>
                     <div class="row-center"><span>{mid_text}</span></div>
                     <div class="row-bottom-area">
-                        <div class="row-lower-left-group">
-                            <div>{sender_name}</div>
-                            <div style="font-size: {sz_kwan}px; margin-top: 6px;">{kwan_text}</div>
+                        <div class="row-lower-company"><span>{sender_company}</span></div>
+                        <div class="row-lower-name-group">
+                            <span style="margin-right: 12px;">{sender_name}</span>
+                            <span style="font-size: {sz_kwan}px;">{kwan_text}</span>
                         </div>
-                        <div class="row-lower-right"><span>{sender_company}</span></div>
                     </div>
                 </div>
                 """
@@ -1012,7 +1196,8 @@ else:
       st.markdown(a4_html, unsafe_allow_html=True)
 
     else:
-      st.markdown("### 🌸 喜慶 / 開幕賀卡設定")
+      # 喜慶 / 開幕賀卡
+      st.markdown("### 🌸 喜慶 / 開幕賀卡設定 (橫式花牌)")
       c_col_1, c_col_2 = st.columns(2)
       with c_col_1:
         recipient_c = st.text_input("收花人 / 對象", value="大吉大利商行 啟")
@@ -1040,14 +1225,14 @@ else:
         full_sender = f"{sender_c} {sender_suffix}"
 
       st.markdown("---")
-      st.markdown("#### 👁️ 預覽喜慶賀卡畫面 (無裝飾線)")
+      st.markdown("#### 👁️ 預覽喜慶賀卡畫面")
 
       a4_joy_html = f"""
             <style>
             .a4-joy {{
-                width: 210mm;
-                height: 297mm;
-                padding: 30mm;
+                width: 297mm;
+                height: 210mm;
+                padding: 25mm 30mm;
                 margin: auto;
                 border: 2px dashed #bbb;
                 background: white;
@@ -1059,14 +1244,14 @@ else:
                 box-shadow: 0 0 15px rgba(0,0,0,0.1);
                 color: #222;
             }}
-            .joy-title {{ font-size: 36px; font-weight: bold; padding-bottom: 15px; letter-spacing: 2px; }}
-            .joy-body {{ font-size: 56px; font-weight: bold; line-height: 2.2; flex-grow: 1; display: flex; align-items: center; justify-content: center; text-align: center; letter-spacing: 8px; color: #b22222; }}
-            .joy-footer {{ font-size: 32px; text-align: right; padding-top: 20px; letter-spacing: 2px; }}
+            .joy-title {{ font-size: 32px; font-weight: bold; letter-spacing: 2px; }}
+            .joy-body {{ font-size: 64px; font-weight: bold; line-height: 2.2; flex-grow: 1; display: flex; align-items: center; justify-content: center; text-align: center; letter-spacing: 12px; color: #b22222; }}
+            .joy-footer {{ font-size: 30px; text-align: right; letter-spacing: 2px; }}
             @media print {{
-                @page {{ size: A4 portrait; }}
+                @page {{ size: A4 landscape; margin: 0; }}
                 body * {{ visibility: hidden; }}
                 .a4-joy, .a4-joy * {{ visibility: visible; }}
-                .a4-joy {{ position: absolute; left: 0; top: 0; border: none; box-shadow: none; }}
+                .a4-joy {{ position: absolute; left: 0; top: 0; border: none; box-shadow: none; width: 297mm; height: 210mm; }}
             }}
             </style>
             <div class="a4-joy">
@@ -1078,5 +1263,5 @@ else:
       st.markdown(a4_joy_html, unsafe_allow_html=True)
 
     st.info(
-        "💡 列印提示：按下 **Ctrl + P**，印表機的紙張方向請選擇對應的**直向 (Portrait)** 或**橫向 (Landscape)** 即可完美列印！"
+        "💡 列印提示：按下 **Ctrl + P**，印表機的紙張方向選擇對應的**直向 (Portrait)** 或**橫向 (Landscape)** 即可完美列印！"
     )
