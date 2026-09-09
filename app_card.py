@@ -11,7 +11,18 @@ from utils import (
 # 頁面設定
 st.set_page_config(page_title="A4 賀卡與輓聯產生系統", layout="wide")
 
-st.title("🖨️ A4 賀卡與輓聯自動產生與管理系統")
+st.title("🖨️ A4 賀卡與輓聯自動產生與排版管理系統")
+
+# 初始化 Session State 以記錄各個元件的位置與字體大小（支援獨立移動與縮放）
+for key, default_val in [
+    ("top_x", 50), ("top_y", 40), ("font_top", 22),
+    ("mid_x", 50), ("mid_y", 200), ("font_mid", 48),
+    ("comp_x", 20), ("comp_y", 800), ("font_comp", 20),
+    ("name_x", 50), ("name_y", 850), ("font_name", 20),
+    ("suff_x", 80), ("suff_y", 850), ("font_suff", 20),
+]:
+    if key not in st.session_state:
+        st.session_state[key] = default_val
 
 if not WEB_APP_URL or "你的網址" in WEB_APP_URL:
     st.warning(
@@ -106,7 +117,7 @@ else:
                 )
 
             with col_s2:
-                st.subheader("二、中款與下款設定")
+                st.subheader("二、中款設定")
                 if card_type == "喪禮（輓聯）":
                     gender = st.radio("性別", ["女", "男"], horizontal=True)
                     if gender == "女":
@@ -120,26 +131,11 @@ else:
                             ],
                         )
                         if "少女" in female_age:
-                            middle_options = [
-                                "遽促芳齡",
-                                "玉殞香消",
-                                "芳華早謝",
-                                "蘭摧蕙折",
-                            ]
+                            middle_options = ["遽促芳齡", "玉殞香消", "芳華早謝", "蘭摧蕙折"]
                         elif "中壯年" in female_age:
-                            middle_options = [
-                                "淑德永昭",
-                                "懿範長存",
-                                "慈容永念",
-                                "德業長昭",
-                            ]
+                            middle_options = ["淑德永昭", "懿範長存", "慈容永念", "德業長昭"]
                         elif "高齡" in female_age:
-                            middle_options = [
-                                "萱範長存",
-                                "母儀千古",
-                                "駕返瑤池",
-                                "萱蔭長留",
-                            ]
+                            middle_options = ["萱範長存", "母儀千古", "駕返瑤池", "萱蔭長留"]
                         else:
                             middle_options = []
                     else:
@@ -154,33 +150,13 @@ else:
                             ],
                         )
                         if "49歲以下" in male_age:
-                            middle_options = [
-                                "星隕少微",
-                                "玉樹長埋",
-                                "壯志未酬",
-                                "天不假年",
-                            ]
+                            middle_options = ["星隕少微", "玉樹長埋", "壯志未酬", "天不假年"]
                         elif "50至69歲" in male_age:
-                            middle_options = [
-                                "棟折梁摧",
-                                "典則空留",
-                                "英氣頓杳",
-                                "德望昭然",
-                            ]
+                            middle_options = ["棟折梁摧", "典則空留", "英氣頓杳", "德望昭然"]
                         elif "70歲至79歲" in male_age:
-                            middle_options = [
-                                "哲人其萎",
-                                "斗柄西移",
-                                "德業長昭",
-                                "典範長存",
-                            ]
+                            middle_options = ["哲人其萎", "斗柄西移", "德業長昭", "典範長存"]
                         elif "80歲以上" in male_age:
-                            middle_options = [
-                                "德高望重",
-                                "魯般圮毀",
-                                "仁者壽",
-                                "德望永昭",
-                            ]
+                            middle_options = ["德高望重", "魯般圮毀", "仁者壽", "德望永昭"]
                         else:
                             middle_options = []
 
@@ -213,39 +189,44 @@ else:
                         else selected_celeb
                     )
 
-                company_name = st.text_input(
-                    "公司 / 單位名稱（下款用）", "桃園市議員"
-                )
-                person_name = st.text_input("名字位置", "李宗豪")
-                suffix_default = (
-                    "敬輓" if card_type == "喪禮（輓聯）" else "敬賀"
-                )
-                suffix_type = st.selectbox(
-                    "結尾敬意", [suffix_default, "敬獻", "自訂"]
-                )
-                suffix_text = (
-                    suffix_type
-                    if suffix_type != "自訂"
-                    else st.text_input("自訂結尾詞", "敬輓")
-                )
+            st.markdown("---")
+            st.subheader("三、下款設定（提供 5 個獨立名字格子）")
+            company_name = st.text_input(
+                "公司 / 單位名稱（下款用）", "桃園市議員"
+            )
+            
+            st.markdown("請填寫送花人名字（最多 5 位）：")
+            col_n1, col_n2, col_n3, col_n4, col_n5 = st.columns(5)
+            with col_n1: name1 = st.text_input("名字 1", "李宗豪")
+            with col_n2: name2 = st.text_input("名字 2", "")
+            with col_n3: name3 = st.text_input("名字 3", "")
+            with col_n4: name4 = st.text_input("名字 4", "")
+            with col_n5: name5 = st.text_input("名字 5", "")
 
-            # 組合下款
-            if company_name and person_name:
-                lower_text = f"{company_name}<br>{person_name} {suffix_text}"
-            elif company_name:
-                lower_text = f"{company_name} {suffix_text}"
-            elif person_name:
-                lower_text = f"{person_name} {suffix_text}"
-            else:
-                lower_text = suffix_text
+            suffix_default = (
+                "敬輓" if card_type == "喪禮（輓聯）" else "敬賀"
+            )
+            suffix_type = st.selectbox(
+                "結尾敬意（敬輓 / 敬悼等）", [suffix_default, "敬獻", "自訂"]
+            )
+            suffix_text = (
+                suffix_type
+                if suffix_type != "自訂"
+                else st.text_input("自訂結尾詞", "敬輓")
+            )
+
+            # 組合 5 個下款名字
+            names = [n.strip() for n in [name1, name2, name3, name4, name5] if n.strip()]
+            names_combined = " ".join(names)
+
+            # 組合完整下款供資料庫記錄
+            lower_text_db = f"{company_name}<br>{names_combined} {suffix_text}" if company_name else f"{names_combined} {suffix_text}"
 
             submitted_save = st.form_submit_button(
                 "💾 儲存卡片至雲端並產生 A4 預覽"
             )
 
             if submitted_save:
-                # 依據賀卡表欄位格式寫入：
-                # 欄位：卡片編號 | 訂單編號 | 卡片類型 | 收花人/靈堂 | 中款/賀詞 | 祝賀文字 | 送花人署名 | 配送地點 | 列印狀態
                 row_card = [
                     card_id,
                     selected_order_id,
@@ -253,7 +234,7 @@ else:
                     recipient_name,
                     middle_text,
                     upper_text,
-                    f"{company_name} {person_name} {suffix_text}",
+                    lower_text_db,
                     deliver_location,
                     "未列印",
                 ]
@@ -266,74 +247,76 @@ else:
                         "儲存失敗，請檢查網路或 Google Apps Script 部署狀態。"
                     )
 
-        # --- A4 即時排版預覽畫面 ---
-        st.markdown("---")
-        st.subheader("📄 A4 即時排版預覽")
+        # --- 側邊欄：各元件獨立微調控制 (X, Y 軸與字體大小) ---
+        st.sidebar.markdown("---")
+        st.sidebar.header("🎚️ 獨立版面與字體微調控制")
+        
+        with st.sidebar.expander("📌 上款設定"):
+            st.session_state.font_top = st.slider("上款字體大小", 12, 50, st.session_state.font_top)
+            st.session_state.top_y = st.slider("上款垂直位置 (Y)", 0, 1000, st.session_state.top_y)
 
-        if orientation == "直式":
-            container_style = """
-                width: 100%;
-                max-width: 600px;
-                aspect-ratio: 1 / 1.414;
-                background: white;
-                color: black;
-                border: 1px solid #ccc;
-                padding: 50px 40px;
-                margin: 0 auto;
-                display: flex;
-                flex-direction: row;
-                justify-content: space-between;
-                align-items: center;
-                font-family: 'DFKai-SB', 'BiauKai', 'STKaiti', serif;
-                box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
-            """
-            layout_html = f"""
-            <div style="{container_style}">
-                <!-- 左側：下款 -->
-                <div style="writing-mode: vertical-rl; font-size: 20px; letter-spacing: 2px; align-self: flex-end;">
-                    {lower_text}
-                </div>
-                <!-- 中間：中款大字 -->
-                <div style="writing-mode: vertical-rl; font-size: 44px; font-weight: bold; letter-spacing: 6px; align-self: center;">
-                    {middle_text}
-                </div>
-                <!-- 右側：上款 -->
-                <div style="writing-mode: vertical-rl; font-size: 22px; letter-spacing: 2px; align-self: flex-start;">
-                    {upper_text}
-                </div>
+        with st.sidebar.expander("📌 中款設定"):
+            st.session_state.font_mid = st.slider("中款字體大小", 20, 150, st.session_state.font_mid)
+            st.session_state.mid_y = st.slider("中款垂直位置 (Y)", 0, 1000, st.session_state.mid_y)
+
+        with st.sidebar.expander("📌 下款單位 (公司) 設定"):
+            st.session_state.font_comp = st.slider("單位字體大小", 12, 40, st.session_state.font_comp)
+            st.session_state.comp_y = st.slider("單位垂直位置 (Y)", 0, 1000, st.session_state.comp_y)
+
+        with st.sidebar.expander("📌 下款名字 (5人) 設定"):
+            st.session_state.font_name = st.slider("名字字體大小", 12, 40, st.session_state.font_name)
+            st.session_state.name_y = st.slider("名字垂直位置 (Y)", 0, 1000, st.session_state.name_y)
+
+        with st.sidebar.expander("📌 敬輓 / 敬悼 / 敬賀 設定"):
+            st.session_state.font_suff = st.slider("敬意字體大小", 12, 40, st.session_state.font_suff)
+            st.session_state.suff_y = st.slider("敬意垂直位置 (Y)", 0, 1000, st.session_state.suff_y)
+
+        # --- A4 即時排版預覽畫面 (獨立定位與縮放) ---
+        st.markdown("---")
+        st.subheader("📄 A4 即時排版預覽（各元件可獨立調整與預覽）")
+
+        container_style = """
+            width: 100%;
+            max-width: 650px;
+            height: 920px;
+            background: white;
+            color: black;
+            border: 2px solid #333;
+            position: relative;
+            margin: 0 auto;
+            font-family: 'DFKai-SB', 'BiauKai', 'STKaiti', serif;
+            box-shadow: 0px 4px 12px rgba(0,0,0,0.15);
+            overflow: hidden;
+        """
+
+        layout_html = f"""
+        <div style="{container_style}">
+            <!-- 上款 -->
+            <div style="position: absolute; top: {st.session_state.top_y}px; left: 50%; transform: translateX(-50%); font-size: {st.session_state.font_top}px; white-space: nowrap; font-weight: bold;">
+                {upper_text}
             </div>
-            """
-        else:
-            container_style = """
-                width: 100%;
-                max-width: 800px;
-                aspect-ratio: 1.414 / 1;
-                background: white;
-                color: black;
-                border: 1px solid #ccc;
-                padding: 40px;
-                margin: 0 auto;
-                display: flex;
-                flex-direction: column;
-                justify-content: space-between;
-                font-family: 'DFKai-SB', 'BiauKai', 'STKaiti', serif;
-                box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
-            """
-            layout_html = f"""
-            <div style="{container_style}">
-                <div style="display: flex; justify-content: space-between; font-size: 20px;">
-                    <div></div>
-                    <div>{upper_text}</div>
-                </div>
-                <div style="text-align: center; font-size: 50px; font-weight: bold; letter-spacing: 8px; margin: auto 0;">
-                    {middle_text}
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 20px;">
-                    <div>{company_name}</div>
-                    <div>{person_name} {suffix_text}</div>
-                </div>
+            
+            <!-- 中款 -->
+            <div style="position: absolute; top: {st.session_state.mid_y}px; left: 50%; transform: translateX(-50%); font-size: {st.session_state.font_mid}px; white-space: nowrap; font-weight: bold; letter-spacing: 6px;">
+                {middle_text}
             </div>
-            """
+            
+            <!-- 下款單位 -->
+            <div style="position: absolute; top: {st.session_state.comp_y}px; left: 60px; font-size: {st.session_state.font_comp}px; white-space: nowrap; font-weight: bold;">
+                {company_name}
+            </div>
+
+            <!-- 下款名字 (5人) -->
+            <div style="position: absolute; top: {st.session_state.name_y}px; right: 140px; font-size: {st.session_state.font_name}px; white-space: nowrap; font-weight: bold;">
+                {names_combined}
+            </div>
+
+            <!-- 敬輓 / 敬悼 / 敬賀 -->
+            <div style="position: absolute; top: {st.session_state.suff_y}px; right: 60px; font-size: {st.session_state.font_suff}px; white-space: nowrap; font-weight: bold;">
+                {suffix_text}
+            </div>
+        </div>
+        """
 
         st.markdown(layout_html, unsafe_allow_html=True)
 
@@ -360,7 +343,7 @@ else:
                     if delete_data("賀卡表", selected_del_card):
                         st.success(f"已成功刪除卡片編號：{selected_del_card}")
                         st.rerun()
-        else:
+        else:  
             st.info(
                 "目前雲端賀卡表中尚無資料，請至第一頁新增卡片或檢查 Google 試算表連線。"
             )
