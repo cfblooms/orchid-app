@@ -160,7 +160,7 @@ else:
       st.info("目前資料庫尚無品種資料。")
 
   # -----------------------------------------
-  # TAB 2: 客戶資料庫 (新增)
+  # TAB 2: 客戶資料庫
   # -----------------------------------------
   with tab2:
     st.header("👥 客戶資料庫管理 (批發商與花店)")
@@ -336,7 +336,7 @@ else:
       st.info("目前尚無進貨資料。")
 
   # -----------------------------------------
-  # TAB 4: 退貨管理區 (對象聯動客戶資料庫)
+  # TAB 4: 退貨管理區
   # -----------------------------------------
   with tab4:
     st.header("🔄 退貨與不良品管理區")
@@ -431,10 +431,10 @@ else:
       st.info("目前尚無退貨紀錄。")
 
   # -----------------------------------------
-  # TAB 5: 訂單與帳務管理
+  # TAB 5: 訂單與帳務管理 (含未結對帳單與列印)
   # -----------------------------------------
   with tab5:
-    st.header("💰 訂單登錄與帳務管理（支援批發與零售）")
+    st.header("💰 訂單登錄與帳務管理（支援已結 / 未結追蹤與對帳列印）")
 
     df_inv_check = get_data("進貨表")
     flower_list = []
@@ -521,12 +521,13 @@ else:
             str(order_date),
             str(expected_date),
             "未出貨",
-            "未付款",
+            "未結",  # 預設為未結
         ]
         if append_data("訂單表", row):
           st.success("成功新增訂單紀錄！")
           st.rerun()
 
+    st.markdown("---")
     st.subheader("📋 訂單與帳務總覽 (狀態更新與刪除)")
     df_order = get_data("訂單表")
     if not df_order.empty:
@@ -539,7 +540,9 @@ else:
         with st.form("update_status_form"):
           selected_upd_id = st.selectbox("選擇要修改的訂單編號", order_ids_list)
           new_shipped = st.selectbox("更新出貨狀態", ["未出貨", "已出貨"])
-          new_payment = st.selectbox("更新付款狀態", ["未付款", "已付款"])
+          new_payment = st.selectbox(
+              "更新付款狀態", ["未結", "已結"]
+          )  # 支援已結與未結
           update_submitted = st.form_submit_button("確認更新狀態")
 
           if update_submitted:
@@ -563,12 +566,149 @@ else:
             if delete_data("訂單表", selected_del_id):
               st.success(f"已成功刪除訂單：{selected_del_id}")
               st.rerun()
+
+      # -----------------------------------------
+      # 新增：依訂購人/批發商名稱整理未結訂單並列印
+      # -----------------------------------------
+      st.markdown("---")
+      st.subheader("📄 未結訂單對帳單與列印")
+      st.markdown(
+          "選擇特定客戶或批發商，系統將自動整理出該客戶的所有「未結」訂單並產生對帳單供列印。"
+      )
+
+      cols = df_order.columns.tolist()
+      pay_col = "付款狀態" if "付款狀態" in cols else cols[-1]
+      cust_col = (
+          "訂購人 / 批發商名稱"
+          if "訂購人 / 批發商名稱" in cols
+          else (cols[2] if len(cols) > 2 else cols[1])
+      )
+      amt_col = None
+      for c in cols:
+        if "金額" in c or "售價" in c:
+          amt_col = c
+          break
+
+      df_unpaid = df_order[df_order[pay_col] == "未結"]
+      if not df_unpaid.empty:
+        unpaid_customers = df_unpaid[cust_col].unique().tolist()
+        selected_statement_cust = st.selectbox(
+            "🔍 選擇要列印未結對帳單的訂購人 / 批發商名稱", unpaid_customers
+        )
+
+        cust_unpaid_df = df_unpaid[df_unpaid[cust_col] == selected_statement_cust]
+
+        st.markdown(f"#### 📋 【{selected_statement_cust}】未結訂單明細")
+        st.dataframe(cust_unpaid_df, use_container_width=True)
+
+        total_unpaid_amount = 0
+        if amt_col:
+          total_unpaid_amount = pd.to_numeric(
+              cust_unpaid_df[amt_col], errors="coerce"
+          ).sum()
+          st.info(
+              f"💰 **{selected_statement_cust}** 目前累積未結總金額：**{total_unpaid_amount:,.0f} 元**"
+          )
+
+        # 產生可供列印的對帳單 HTML 區塊
+        print_html = f"""
+                <style>
+                .statement-box {{
+                    width: 210mm;
+                    padding: 20mm;
+                    margin: 20px auto;
+                    background: white;
+                    border: 2px dashed #999;
+                    font-family: "DFKai-SB", "BiauKai", "標楷體", serif;
+                    color: #000;
+                    box-sizing: border-box;
+                    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                }}
+                .statement-title {{ text-align: center; font-size: 26px; font-weight: bold; margin-bottom: 25px; letter-spacing: 2px; }}
+                .statement-info {{ display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 16px; }}
+                .statement-table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; }}
+                .statement-table th, .statement-table td {{ border: 1.5px solid #000; padding: 10px 12px; font-size: 15px; text-align: left; }}
+                .statement-table th {{ background-color: #f0f0f0; }}
+                .statement-footer {{ text-align: right; font-size: 18px; font-weight: bold; margin-top: 20px; letter-spacing: 1px; }}
+                @media print {{
+                    @page {{ size: A4 portrait; margin: 10mm; }}
+                    body * {{ visibility: hidden; }}
+                    .statement-box, .statement-box * {{ visibility: visible; }}
+                    .statement-box {{ position: absolute; left: 0; top: 0; border: none; width: 100%; margin: 0; padding: 10mm; box-shadow: none; }}
+                }}
+                </style>
+                <div class="statement-box">
+                    <div class="statement-title">🌸 蘭花業務未結款項對帳單 🌸</div>
+                    <div class="statement-info">
+                        <div><strong>客戶 / 批發商名稱：</strong> {selected_statement_cust}</div>
+                        <div><strong>製表日期：</strong> {datetime.date.today().strftime('%Y-%m-%d')}</div>
+                    </div>
+                    <table class="statement-table">
+                        <thead>
+                            <tr>
+                                <th>訂單編號</th>
+                                <th>品項與規格</th>
+                                <th>下單日期</th>
+                                <th>預計出貨</th>
+                                <th>金額 (元)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                """
+        for _, r in cust_unpaid_df.iterrows():
+          o_id = (
+              r["訂單編號"]
+              if "訂單編號" in r
+              else r.get(cols[0], "---")
+          )
+          o_spec = (
+              r["品項規格"]
+              if "品項規格" in r
+              else r.get(cols[3] if len(cols) > 3 else cols[1], "---")
+          )
+          o_date = (
+              r["下單日期"]
+              if "下單日期" in r
+              else r.get(cols[9] if len(cols) > 9 else "", "---")
+          )
+          exp_date = (
+              r["預計出貨日期"]
+              if "預計出貨日期" in r
+              else r.get(cols[10] if len(cols) > 10 else "", "---")
+          )
+          amt = r.get(amt_col, 0) if amt_col else 0
+
+          print_html += f"""
+                            <tr>
+                                <td>{o_id}</td>
+                                <td>{o_spec}</td>
+                                <td>{o_date}</td>
+                                <td>{exp_date}</td>
+                                <td>{amt}</td>
+                            </tr>
+                        """
+
+        print_html += f"""
+                        </tbody>
+                    </table>
+                    <div class="statement-footer">
+                        未結總計金額： NT$ {total_unpaid_amount:,.0f} 元
+                    </div>
+                </div>
+                """
+        st.markdown(print_html, unsafe_allow_html=True)
+        st.info(
+            "💡 列印提示：請直接按下鍵盤 **Ctrl + P**，即可將上方預覽的「未結對帳單」列印輸出！"
+        )
+      else:
+        st.success("🎉 目前所有訂單皆已結清，沒有未結訂單！")
     else:
       st.info("目前尚無訂單資料。")
 
   # -----------------------------------------
   # TAB 6: A4 輓聯與卡片產生器
   # -----------------------------------------
+  app_tab6_mode = True  # placeholder
   with tab6:
     st.header("🖨️ A4 輓聯與喜慶賀卡產生器")
     st.markdown(
@@ -621,7 +761,6 @@ else:
       )
 
       if orientation == "A4 橫式排版":
-        # 橫式：左下方角落放 王大明 (在上方) 與 敬輓 (在下方正下方)
         a4_html = f"""
                 <style>
                 .a4-landscape {{
@@ -674,7 +813,6 @@ else:
                 </div>
                 """
       else:
-        # 直式：左下方角落放 王大明 (在上方) 與 敬輓 (在下方)
         a4_html = f"""
                 <style>
                 .a4-portrait {{
