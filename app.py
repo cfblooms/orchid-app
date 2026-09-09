@@ -106,7 +106,7 @@ else:
   )
 
   # -----------------------------------------
-  # TAB 1: 蘭花品種資料庫
+  # TAB 1: 蘭花品種資料庫 (新增修改與刪除)
   # -----------------------------------------
   with tab1:
     st.header("🌸 蘭花品種寫入與資料庫管理")
@@ -139,10 +139,59 @@ else:
           st.rerun()
 
     st.markdown("---")
-    st.subheader("📋 現有蘭花資料庫總覽")
+    st.subheader("📋 現有蘭花資料庫總覽與修改/刪除")
     df_db = get_data("蘭花資料庫")
     if not df_db.empty:
       st.dataframe(df_db, use_container_width=True)
+
+      db_ids = df_db[df_db.columns[0]].astype(str).tolist()
+      selected_db_id = st.selectbox(
+          "選擇要修改或刪除的品種編號", db_ids, key="sel_db_mod"
+      )
+
+      selected_db_row = df_db[
+          df_db[df_db.columns[0]].astype(str) == selected_db_id
+      ]
+      if not selected_db_row.empty:
+        r_vals = selected_db_row.iloc[0].tolist()
+        cur_name = r_vals[1] if len(r_vals) > 1 else ""
+        cur_note = r_vals[2] if len(r_vals) > 2 else ""
+        cur_photo = r_vals[3] if len(r_vals) > 3 else ""
+
+        with st.form("update_db_form"):
+          upd_db_name = st.text_input("修改品種名稱", value=cur_name)
+          upd_db_note = st.text_input("修改品種特色說明", value=cur_note)
+          upd_db_file = st.file_uploader(
+              "📷 重新上傳品種標準照片 (若不換則留空)",
+              type=["jpg", "jpeg", "png"],
+              key="upd_db_file",
+          )
+
+          col_u1, col_u2 = st.columns(2)
+          with col_u1:
+            submitted_upd_db = st.form_submit_button("確認修改品種資料")
+          with col_u2:
+            submitted_del_db = st.form_submit_button("🗑️ 刪除此品種")
+
+          if submitted_upd_db:
+            img_path = cur_photo
+            if upd_db_file is not None:
+              file_ext = upd_db_file.name.split(".")[-1]
+              img_filename = f"{selected_db_id}_{datetime.datetime.now().strftime('%H%M%S')}.{file_ext}"
+              img_path = os.path.join("photos", img_filename)
+              with open(img_path, "wb") as f:
+                f.write(upd_db_file.getbuffer())
+            new_row_db = [selected_db_id, upd_db_name, upd_db_note, img_path]
+            if update_data("蘭花資料庫", selected_db_id, new_row_db):
+              st.success(f"品種編號 {selected_db_id} 修改成功！")
+              st.rerun()
+
+          if submitted_del_db:
+            if delete_data("蘭花資料庫", selected_db_id):
+              st.success(f"品種編號 {selected_db_id} 刪除成功！")
+              st.rerun()
+
+      st.markdown("---")
       for index, row in df_db.iterrows():
         cols = st.columns([1, 3])
         with cols[0]:
@@ -160,7 +209,7 @@ else:
       st.info("目前資料庫尚無品種資料。")
 
   # -----------------------------------------
-  # TAB 2: 客戶資料庫
+  # TAB 2: 客戶資料庫 (新增 Line 名稱、修改與刪除)
   # -----------------------------------------
   with tab2:
     st.header("👥 客戶資料庫管理 (批發商與花店)")
@@ -176,32 +225,75 @@ else:
       with c_col2:
         cust_type = st.selectbox("客戶類別", ["批發商", "花店", "其他"])
         cust_phone = st.text_input("聯絡電話 / 備註", value="0912-345678")
+        cust_line = st.text_input("Line 名稱", value="")
 
       cust_submitted = st.form_submit_button("儲存客戶資料")
       if cust_submitted:
-        row_cust = [cust_id, cust_name, cust_type, cust_phone]
+        row_cust = [cust_id, cust_name, cust_type, cust_phone, cust_line]
         if append_data("客戶資料庫", row_cust):
           st.success(f"成功新增客戶「{cust_name}」！")
           st.rerun()
 
     st.markdown("---")
-    st.subheader("📋 現有客戶清單")
+    st.subheader("📋 現有客戶清單與修改/刪除")
     df_cust = get_data("客戶資料庫")
     if not df_cust.empty:
       st.dataframe(df_cust, use_container_width=True)
+
       cust_ids = df_cust[df_cust.columns[0]].astype(str).tolist()
       selected_cust_id = st.selectbox(
-          "選擇要刪除的客戶編號", cust_ids, key="del_cust"
+          "選擇要修改或刪除的客戶編號", cust_ids, key="sel_cust_mod"
       )
-      if st.button("🗑️ 刪除此客戶"):
-        if delete_data("客戶資料庫", selected_cust_id):
-          st.success(f"已成功刪除客戶編號：{selected_cust_id}")
-          st.rerun()
+
+      selected_cust_row = df_cust[
+          df_cust[df_cust.columns[0]].astype(str) == selected_cust_id
+      ]
+      if not selected_cust_row.empty:
+        r_c_vals = selected_cust_row.iloc[0].tolist()
+        c_name = r_c_vals[1] if len(r_c_vals) > 1 else ""
+        c_type = r_c_vals[2] if len(r_c_vals) > 2 else "批發商"
+        c_phone = r_c_vals[3] if len(r_c_vals) > 3 else ""
+        c_line = r_c_vals[4] if len(r_c_vals) > 4 else ""
+
+        types_list = ["批發商", "花店", "其他"]
+        default_type_idx = (
+            types_list.index(c_type) if c_type in types_list else 0
+        )
+
+        with st.form("update_cust_form"):
+          upd_c_name = st.text_input("修改客戶 / 店鋪名稱", value=c_name)
+          upd_c_type = st.selectbox(
+              "修改客戶類別", types_list, index=default_type_idx
+          )
+          upd_c_phone = st.text_input("修改聯絡電話 / 備註", value=c_phone)
+          upd_c_line = st.text_input("修改 Line 名稱", value=c_line)
+
+          col_uc1, col_uc2 = st.columns(2)
+          with col_uc1:
+            sub_upd_cust = st.form_submit_button("確認修改客戶資料")
+          with col_uc2:
+            sub_del_cust = st.form_submit_button("🗑️ 刪除此客戶")
+
+          if sub_upd_cust:
+            new_row_cust = [
+                selected_cust_id,
+                upd_c_name,
+                upd_c_type,
+                upd_c_phone,
+                upd_c_line,
+            ]
+            if update_data("客戶資料庫", selected_cust_id, new_row_cust):
+              st.success(f"客戶編號 {selected_cust_id} 修改成功！")
+              st.rerun()
+          if sub_del_cust:
+            if delete_data("客戶資料庫", selected_cust_id):
+              st.success(f"已成功刪除客戶編號：{selected_cust_id}")
+              st.rerun()
     else:
       st.info("目前尚無客戶資料。")
 
   # -----------------------------------------
-  # TAB 3: 進貨與庫存管理 (含照片預覽)
+  # TAB 3: 進貨與庫存管理
   # -----------------------------------------
   with tab3:
     st.header("📦 新增進貨與庫存管理")
@@ -336,13 +428,10 @@ else:
       st.info("目前尚無進貨資料。")
 
   # -----------------------------------------
-  # TAB 4: 退貨管理區
+  # TAB 4: 退貨管理區 (已刪除說明文字)
   # -----------------------------------------
   with tab4:
     st.header("🔄 退貨與不良品管理區")
-    st.markdown(
-        "可清楚區分【我們向花農退貨】或【批發商向我們退貨】，對象可從「客戶資料庫」選取或自行輸入。"
-    )
 
     df_inv_chk = get_data("進貨表")
     inv_items_list = (
@@ -417,16 +506,95 @@ else:
           st.success("成功記錄退貨資料！")
           st.rerun()
 
-    st.subheader("📋 現有退貨紀錄清單")
+    st.subheader("📋 現有退貨紀錄清單與修改/刪除")
     df_ret = get_data("退貨表")
     if not df_ret.empty:
       st.dataframe(df_ret, use_container_width=True)
+
       ret_ids = df_ret[df_ret.columns[0]].astype(str).tolist()
-      selected_ret_id = st.selectbox("選擇要刪除的退貨編號", ret_ids, key="del_ret")
-      if st.button("🗑️ 刪除此筆退貨紀錄"):
-        if delete_data("退貨表", selected_ret_id):
-          st.success(f"已刪除退貨編號：{selected_ret_id}")
-          st.rerun()
+      selected_ret_id = st.selectbox(
+          "選擇要修改或刪除的退貨編號", ret_ids, key="sel_ret_mod"
+      )
+
+      sel_ret_row = df_ret[
+          df_ret[df_ret.columns[0]].astype(str) == selected_ret_id
+      ]
+      if not sel_ret_row.empty:
+        r_vals = sel_ret_row.iloc[0].tolist()
+        r_type = r_vals[1] if len(r_vals) > 1 else ""
+        p_name = r_vals[2] if len(r_vals) > 2 else ""
+        t_item = r_vals[3] if len(r_vals) > 3 else ""
+        b_qty = (
+            int(r_vals[4])
+            if len(r_vals) > 4 and str(r_vals[4]).isdigit()
+            else 1
+        )
+        u_price = (
+            float(r_vals[5])
+            if len(r_vals) > 5 and str(r_vals[5]).replace(".", "", 1).isdigit()
+            else 0.0
+        )
+        r_date_str = r_vals[7] if len(r_vals) > 7 else str(datetime.date.today())
+        r_reason = r_vals[8] if len(r_vals) > 8 else ""
+
+        try:
+          parsed_ret_date = datetime.datetime.strptime(
+              r_date_str, "%Y-%m-%d"
+          ).date()
+        except:
+          parsed_ret_date = datetime.date.today()
+
+        ret_types_list = [
+            "1. 我們向花農退貨 (退給供應商)",
+            "2. 批發商向我們退貨 (客戶退回)",
+        ]
+        d_r_type_idx = (
+            ret_types_list.index(r_type) if r_type in ret_types_list else 0
+        )
+
+        with st.form("update_ret_form"):
+          upd_ret_type = st.selectbox(
+              "修改退貨類型選擇", ret_types_list, index=d_r_type_idx
+          )
+          upd_party_name = st.text_input("修改對象名稱", value=p_name)
+          upd_target_item = st.text_input("修改關聯進貨品項/批次", value=t_item)
+          upd_bad_qty = st.number_input(
+              "修改退貨/不良株數 (棵)", min_value=1, value=b_qty
+          )
+          upd_unit_price = st.number_input(
+              "修改每棵單價 / 成本 (元)", min_value=0.0, value=u_price
+          )
+          upd_ret_date = st.date_input("修改處理日期", value=parsed_ret_date)
+          upd_reason = st.text_input("修改退貨原因說明", value=r_reason)
+
+          upd_tot_amt = float(upd_bad_qty) * float(upd_unit_price)
+          st.info(f"💡 系統重新計算總金額：**{upd_tot_amt} 元**")
+
+          col_ur1, col_ur2 = st.columns(2)
+          with col_ur1:
+            sub_upd_ret = st.form_submit_button("確認修改退貨紀錄")
+          with col_ur2:
+            sub_del_ret = st.form_submit_button("🗑️ 刪除此退貨紀錄")
+
+          if sub_upd_ret:
+            new_row_ret = [
+                selected_ret_id,
+                upd_ret_type,
+                upd_party_name,
+                upd_target_item,
+                int(upd_bad_qty),
+                float(upd_unit_price),
+                float(upd_tot_amt),
+                str(upd_ret_date),
+                upd_reason,
+            ]
+            if update_data("退貨表", selected_ret_id, new_row_ret):
+              st.success(f"退貨編號 {selected_ret_id} 修改成功！")
+              st.rerun()
+          if sub_del_ret:
+            if delete_data("退貨表", selected_ret_id):
+              st.success(f"已刪除退貨編號：{selected_ret_id}")
+              st.rerun()
     else:
       st.info("目前尚無退貨紀錄。")
 
@@ -521,7 +689,7 @@ else:
             str(order_date),
             str(expected_date),
             "未出貨",
-            "未結",  # 預設為未結
+            "未結",
         ]
         if append_data("訂單表", row):
           st.success("成功新增訂單紀錄！")
@@ -540,9 +708,7 @@ else:
         with st.form("update_status_form"):
           selected_upd_id = st.selectbox("選擇要修改的訂單編號", order_ids_list)
           new_shipped = st.selectbox("更新出貨狀態", ["未出貨", "已出貨"])
-          new_payment = st.selectbox(
-              "更新付款狀態", ["未結", "已結"]
-          )  # 支援已結與未結
+          new_payment = st.selectbox("更新付款狀態", ["未結", "已結"])
           update_submitted = st.form_submit_button("確認更新狀態")
 
           if update_submitted:
@@ -568,7 +734,7 @@ else:
               st.rerun()
 
       # -----------------------------------------
-      # 新增：依訂購人/批發商名稱整理未結訂單並列印
+      # 依訂購人/批發商名稱整理未結訂單並列印
       # -----------------------------------------
       st.markdown("---")
       st.subheader("📄 未結訂單對帳單與列印")
@@ -610,7 +776,6 @@ else:
               f"💰 **{selected_statement_cust}** 目前累積未結總金額：**{total_unpaid_amount:,.0f} 元**"
           )
 
-        # 產生可供列印的對帳單 HTML 區塊
         print_html = f"""
                 <style>
                 .statement-box {{
@@ -706,26 +871,16 @@ else:
       st.info("目前尚無訂單資料。")
 
   # -----------------------------------------
-  # TAB 6: A4 輓聯與卡片產生器
+  # TAB 6: A4 輓聯與卡片產生器 (直式放前面、無背景風格選擇、無裝飾線)
   # -----------------------------------------
-  app_tab6_mode = True  # placeholder
   with tab6:
     st.header("🖨️ A4 輓聯與喜慶賀卡產生器")
-    st.markdown(
-        "【喪禮傳統輓聯】：王大明在敬輓正上方，且敬輓固定在左下方角落。<br>【喜慶賀卡】："
-        " 上款自動帶入恭祝，中款可快速選擇 5 大經典賀詞。"
-    )
 
     card_mode = st.selectbox("選擇卡片類型", ["喪禮傳統輓聯", "喜慶 / 開幕賀卡"])
 
     if card_mode == "喪禮傳統輓聯":
       orientation = st.radio(
-          "選擇輓聯列印方向", ["A4 橫式排版", "A4 直式排版"], horizontal=True
-      )
-
-      card_style_bg = st.selectbox(
-          "卡片背景風格",
-          ["典雅紫藍暈染風 (如範例圖)", "簡約純白底色"],
+          "選擇輓聯列印方向", ["A4 直式排版", "A4 橫式排版"], horizontal=True
       )
 
       with st.expander("⚙️ 自由調整字體大小設定", expanded=True):
@@ -748,19 +903,60 @@ else:
         mid_text = st.text_input("輸入中款輓辭 (如: 上品上生)", value="上品上生")
       with col_l:
         st.markdown("**【下款與敬輓設定】**")
-        sender_company = st.text_input("機關/公司 (放右下或對側)", value="臺北市政府")
+        sender_company = st.text_input("機關/公司", value="臺北市政府")
         sender_name = st.text_input("落款名字 (王大明)", value="王大明")
         kwan_text = st.text_input("敬輓字樣", value="敬輓")
 
       st.markdown("---")
 
-      bg_css = (
-          "background: linear-gradient(135deg, #e3e8f8 0%, #f3e6f8 100%);"
-          if "紫藍暈染" in card_style_bg
-          else "background: white;"
-      )
-
-      if orientation == "A4 橫式排版":
+      if orientation == "A4 直式排版":
+        a4_html = f"""
+                <style>
+                .a4-portrait {{
+                    width: 210mm;
+                    height: 297mm;
+                    padding: 20mm 15mm;
+                    margin: auto;
+                    border: 2px dashed #bbb;
+                    background: white;
+                    font-family: "DFKai-SB", "BiauKai", "標楷體", "KaiTi", serif;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    box-sizing: border-box;
+                    box-shadow: 0 0 15px rgba(0,0,0,0.1);
+                    color: #000;
+                }}
+                .col-right {{ writing-mode: vertical-rl; font-size: {sz_upper}px; letter-spacing: 4px; height: 90%; display: flex; align-items: flex-start; }}
+                .col-center {{ writing-mode: vertical-rl; font-size: {sz_mid}px; letter-spacing: 12px; height: 90%; display: flex; justify-content: center; align-items: center; font-weight: bold; }}
+                .col-left-group {{ height: 90%; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; }}
+                .col-bottom-left-stack {{
+                    writing-mode: horizontal-tb;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                }}
+                .col-lower {{ writing-mode: vertical-rl; font-size: {sz_lower}px; letter-spacing: 4px; }}
+                @media print {{
+                    @page {{ size: A4 portrait; }}
+                    body * {{ visibility: hidden; }}
+                    .a4-portrait, .a4-portrait * {{ visibility: visible; }}
+                    .a4-portrait {{ position: absolute; left: 0; top: 0; border: none; box-shadow: none; width: 210mm; height: 297mm; }}
+                }}
+                </style>
+                <div class="a4-portrait">
+                    <div class="col-left-group">
+                        <div class="col-bottom-left-stack">
+                            <div style="font-size: {sz_lower}px; letter-spacing: 4px; margin-bottom: 6px;">{sender_name}</div>
+                            <div style="font-size: {sz_kwan}px; letter-spacing: 4px;">{kwan_text}</div>
+                        </div>
+                        <div class="col-lower"><span>{sender_company}</span></div>
+                    </div>
+                    <div class="col-center"><span>{mid_text}</span></div>
+                    <div class="col-right"><span>{upper_text}</span></div>
+                </div>
+                """
+      else:
         a4_html = f"""
                 <style>
                 .a4-landscape {{
@@ -769,7 +965,7 @@ else:
                     padding: 20mm 25mm;
                     margin: auto;
                     border: 2px dashed #bbb;
-                    {bg_css}
+                    background: white;
                     font-family: "DFKai-SB", "BiauKai", "標楷體", "KaiTi", serif;
                     display: flex;
                     flex-direction: column;
@@ -812,54 +1008,6 @@ else:
                     </div>
                 </div>
                 """
-      else:
-        a4_html = f"""
-                <style>
-                .a4-portrait {{
-                    width: 210mm;
-                    height: 297mm;
-                    padding: 20mm 15mm;
-                    margin: auto;
-                    border: 2px dashed #bbb;
-                    {bg_css}
-                    font-family: "DFKai-SB", "BiauKai", "標楷體", "KaiTi", serif;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: flex-start;
-                    box-sizing: border-box;
-                    box-shadow: 0 0 15px rgba(0,0,0,0.1);
-                    color: #000;
-                }}
-                .col-right {{ writing-mode: vertical-rl; font-size: {sz_upper}px; letter-spacing: 4px; height: 90%; display: flex; align-items: flex-start; }}
-                .col-center {{ writing-mode: vertical-rl; font-size: {sz_mid}px; letter-spacing: 12px; height: 90%; display: flex; justify-content: center; align-items: center; font-weight: bold; }}
-                .col-left-group {{ height: 90%; display: flex; gap: 20px; align-items: flex-end; }}
-                .col-bottom-left-stack {{
-                    writing-mode: vertical-rl;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: flex-start;
-                    letter-spacing: 4px;
-                }}
-                .col-lower {{ writing-mode: vertical-rl; font-size: {sz_lower}px; letter-spacing: 4px; }}
-                @media print {{
-                    @page {{ size: A4 portrait; }}
-                    body * {{ visibility: hidden; }}
-                    .a4-portrait, .a4-portrait * {{ visibility: visible; }}
-                    .a4-portrait {{ position: absolute; left: 0; top: 0; border: none; box-shadow: none; width: 210mm; height: 297mm; }}
-                }}
-                </style>
-                <div class="a4-portrait">
-                    <div class="col-left-group">
-                        <div class="col-bottom-left-stack">
-                            <div style="font-size: {sz_lower}px; margin-bottom: 10px;">{sender_name}</div>
-                            <div style="font-size: {sz_kwan}px;">{kwan_text}</div>
-                        </div>
-                        <div class="col-lower"><span>{sender_company}</span></div>
-                    </div>
-                    <div class="col-center"><span>{mid_text}</span></div>
-                    <div class="col-right"><span>{upper_text}</span></div>
-                </div>
-                """
 
       st.markdown(a4_html, unsafe_allow_html=True)
 
@@ -892,7 +1040,7 @@ else:
         full_sender = f"{sender_c} {sender_suffix}"
 
       st.markdown("---")
-      st.markdown("#### 👁️ 預覽喜慶賀卡畫面")
+      st.markdown("#### 👁️ 預覽喜慶賀卡畫面 (無裝飾線)")
 
       a4_joy_html = f"""
             <style>
@@ -911,9 +1059,9 @@ else:
                 box-shadow: 0 0 15px rgba(0,0,0,0.1);
                 color: #222;
             }}
-            .joy-title {{ font-size: 36px; font-weight: bold; border-bottom: 2px solid #333; padding-bottom: 15px; letter-spacing: 2px; }}
+            .joy-title {{ font-size: 36px; font-weight: bold; padding-bottom: 15px; letter-spacing: 2px; }}
             .joy-body {{ font-size: 56px; font-weight: bold; line-height: 2.2; flex-grow: 1; display: flex; align-items: center; justify-content: center; text-align: center; letter-spacing: 8px; color: #b22222; }}
-            .joy-footer {{ font-size: 32px; text-align: right; border-top: 1.5px solid #ddd; padding-top: 20px; letter-spacing: 2px; }}
+            .joy-footer {{ font-size: 32px; text-align: right; padding-top: 20px; letter-spacing: 2px; }}
             @media print {{
                 @page {{ size: A4 portrait; }}
                 body * {{ visibility: hidden; }}
@@ -930,5 +1078,5 @@ else:
       st.markdown(a4_joy_html, unsafe_allow_html=True)
 
     st.info(
-        "💡 列印提示：按下 **Ctrl + P**，印表機的紙張方向請選擇對應的**橫向 (Landscape)** 或**直向 (Portrait)** 即可完美列印！"
+        "💡 列印提示：按下 **Ctrl + P**，印表機的紙張方向請選擇對應的**直向 (Portrait)** 或**橫向 (Landscape)** 即可完美列印！"
     )
