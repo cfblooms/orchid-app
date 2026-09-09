@@ -11,7 +11,7 @@ st.set_page_config(
 # ==========================================
 # ⚙️ 雲端連線設定
 # ==========================================
-WEB_APP_URL = "https://script.google.com/macros/s/你的網址/exec"
+WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyNmqySFSFKuGzqEzTc9A52SwkmTToCf2N-4pXI0EmOPFgriV1Bana3rLjgo-Q3WqtM/exec"
 
 # 自動建立本地相片儲存資料夾
 if not os.path.exists("photos"):
