@@ -9,7 +9,7 @@ st.set_page_config(
 )
 
 # ==========================================
-# ⚙️ 雲端連線設定（已自動填入你的專屬網址！）
+# ⚙️ 雲端連線設定
 # ==========================================
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyNmqySFSFKuGzqEzTc9A52SwkmTToCf2N-4pXI0EmOPFgriV1Bana3rLjgo-Q3WqtM/exec"
 
@@ -51,7 +51,7 @@ def append_data(sheet_name, row_data):
     return False
 
 
-# 自動生成依日期的流水編號
+# 自動生成依日期的流水編號 (當日日期 + 第幾筆)
 def get_next_id(prefix, sheet_name):
   today_str = datetime.datetime.now().strftime("%m%d")
   df = get_data(sheet_name)
@@ -206,17 +206,22 @@ else:
         else:
           orchid_used = st.text_input("使用蘭花名稱")
 
-        stalks_count = st.slider("株數選擇", 3, 20, 10)
-        pot_used = st.selectbox(
-            "選擇使用盆器",
-            [
-                "桌上盆 (100)",
-                "落地盆-喪 (100)",
-                "落地盆-喜 (200)",
-                "羅馬盆 (280)",
-                "無盆",
-            ],
-        )
+        # 批發客戶不需要選株數與盆器
+        if cust_type == "批發":
+          batch_qty = st.number_input("批發數量 (批)", min_value=1, value=1)
+          pot_used = "批發免盆"
+        else:
+          stalks_count = st.slider("株數選擇", 3, 20, 10)
+          pot_used = st.selectbox(
+              "選擇使用盆器",
+              [
+                  "桌上盆 (100)",
+                  "落地盆-喪 (100)",
+                  "落地盆-喜 (200)",
+                  "羅馬盆 (280)",
+                  "無盆",
+              ],
+          )
       with col3:
         cost_price = st.number_input("預估總成本 (元)", min_value=0, value=600)
         sell_price = st.number_input("售價 (元)", min_value=0, value=1500)
@@ -233,11 +238,16 @@ else:
 
       order_submitted = st.form_submit_button("確認新增訂單")
       if order_submitted:
+        if cust_type == "批發":
+          item_spec_str = f"{orchid_used} | 批發 {batch_qty} 批"
+        else:
+          item_spec_str = f"{orchid_used} | {stalks_count}棵"
+
         row = [
             order_id,
             cust_type,
             customer,
-            f"{orchid_used} | {stalks_count}棵",
+            item_spec_str,
             pot_used,
             delivery_method,
             payment_term,
@@ -258,7 +268,7 @@ else:
       st.dataframe(df_order, use_container_width=True)
 
       st.markdown("---")
-      st.subheader("📝 訂單狀態快速更新 (出貨與付款)")
+      st.subheader("📝 訂單狀態快速更新 (選擇訂單編號即時修改)")
       with st.form("update_status_form"):
         order_ids_list = (
             df_order["訂單編號"].tolist() if "訂單編號" in df_order.columns else []
@@ -272,7 +282,8 @@ else:
         update_submitted = st.form_submit_button("確認更新該筆訂單狀態")
         if update_submitted:
           st.info(
-              f"💡 訂單 {selected_upd_id} 狀態已修改。請至 Google 試算表確認。"
+              f"💡 訂單 {selected_upd_id} 已更新狀態（出貨：{new_shipped} /"
+              f" 付款：{new_payment}）。請至 Google 試算表對應編號列進行確認或覆蓋。"
           )
     else:
       st.info("目前尚無訂單資料。")
@@ -283,10 +294,15 @@ else:
     card_mode = st.selectbox("選擇卡片類型", ["喪禮傳統輓聯", "喜慶 / 開幕賀卡"])
 
     if card_mode == "喪禮傳統輓聯":
-      st.markdown("### 🕊️ 傳統直式輓聯設定與排版")
+      st.markdown("### 🕊️ 傳統輓聯設定 (支援直式與橫式)")
 
-      # 字體大小調整控制區 (預設對應您的需求：上款72、中款180、下款80、敬輓70)
-      with st.expander("⚙️ 調整字體大小與版面設定", expanded=True):
+      # 排版方向選擇
+      orientation = st.radio(
+          "選擇列印排版方向", ["直式排版 (傳統直書)", "橫式排版 (上中下結構)"], horizontal=True
+      )
+
+      # 字體大小調整控制區
+      with st.expander("⚙️ 調整字體大小設定", expanded=True):
         f_col1, f_col2, f_col3, f_col4 = st.columns(4)
         with f_col1:
           sz_upper = st.slider("上款字體大小", 40, 120, 72)
@@ -300,7 +316,7 @@ else:
       col_r, col_m, col_l = st.columns(3)
 
       with col_r:
-        st.markdown("**【右邊：上款】**")
+        st.markdown("**【上款設定】**")
         upper_preset = st.selectbox(
             "上款常用敬悼",
             [
@@ -321,7 +337,7 @@ else:
           upper_text = upper_preset
 
       with col_m:
-        st.markdown("**【中間：中款 / 輓辭】**")
+        st.markdown("**【中款 / 輓辭設定】**")
         gender_choice = st.selectbox(
             "逝者性別與年齡分類",
             [
@@ -396,88 +412,144 @@ else:
           mid_text = st.text_input("輸入自訂中款輓辭", value="懿德長昭")
 
       with col_l:
-        st.markdown("**【左邊：下款與敬輓】**")
+        st.markdown("**【下款與敬輓設定】**")
         sender_company = st.text_input("公司名稱", value="立成鋼鐵有限公司")
         sender_name = st.text_input("姓名 / 落款", value="林春吉")
-        sender_extra = st.text_input("額外稱謂 (如: 暨全體同仁)", value="暨全體同仁")
+        sender_extra = st.text_input("額外稱謂", value="暨全體同仁")
         kwan_text = st.text_input("敬輓字樣", value="敬輓")
 
       st.markdown("---")
 
-      # A4 預覽與排版 (強制使用標楷體、直式書寫、對應您的精準字體大小)
-      a4_mourning_html = f"""
-            <style>
-            .a4-page {{
-                width: 210mm;
-                height: 297mm;
-                padding: 20mm 15mm;
-                margin: auto;
-                border: 2px dashed #bbb;
-                background: white;
-                font-family: "DFKai-SB", "BiauKai", "標楷體", "KaiTi", serif;
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-start;
-                box-sizing: border-box;
-                box-shadow: 0 0 15px rgba(0,0,0,0.1);
-                color: #000;
-            }}
-            .col-right {{
-                writing-mode: vertical-rl;
-                font-size: {sz_upper}px;
-                letter-spacing: 4px;
-                height: 90%;
-                display: flex;
-                align-items: flex-start;
-            }}
-            .col-center {{
-                writing-mode: vertical-rl;
-                font-size: {sz_mid}px;
-                letter-spacing: 12px;
-                height: 90%;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                font-weight: bold;
-            }}
-            .col-left-group {{
-                height: 90%;
-                display: flex;
-                gap: 15px;
-                align-items: flex-end;
-            }}
-            .col-kwan {{
-                writing-mode: vertical-rl;
-                font-size: {sz_kwan}px;
-                letter-spacing: 4px;
-            }}
-            .col-lower {{
-                writing-mode: vertical-rl;
-                font-size: {sz_lower}px;
-                letter-spacing: 4px;
-            }}
-            @media print {{
-                body * {{ visibility: hidden; }}
-                .a4-page, .a4-page * {{ visibility: visible; }}
-                .a4-page {{ position: absolute; left: 0; top: 0; border: none; box-shadow: none; width: 210mm; height: 297mm; }}
-            }}
-            </style>
-            <div class="a4-page">
-                <div class="col-left-group">
-                    <div class="col-kwan"><span>{kwan_text}</span></div>
-                    <div class="col-lower"><span>{sender_extra}</span></div>
-                    <div class="col-lower"><span>{sender_name}</span></div>
-                    <div class="col-lower"><span>{sender_company}</span></div>
+      # 根據選擇顯示直式或橫式預覽
+      if orientation == "直式排版 (傳統直書)":
+        a4_html = f"""
+                <style>
+                .a4-page {{
+                    width: 210mm;
+                    height: 297mm;
+                    padding: 20mm 15mm;
+                    margin: auto;
+                    border: 2px dashed #bbb;
+                    background: white;
+                    font-family: "DFKai-SB", "BiauKai", "標楷體", "KaiTi", serif;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    box-sizing: border-box;
+                    box-shadow: 0 0 15px rgba(0,0,0,0.1);
+                    color: #000;
+                }}
+                .col-right {{
+                    writing-mode: vertical-rl;
+                    font-size: {sz_upper}px;
+                    letter-spacing: 4px;
+                    height: 90%;
+                    display: flex;
+                    align-items: flex-start;
+                }}
+                .col-center {{
+                    writing-mode: vertical-rl;
+                    font-size: {sz_mid}px;
+                    letter-spacing: 12px;
+                    height: 90%;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    font-weight: bold;
+                }}
+                .col-left-group {{
+                    height: 90%;
+                    display: flex;
+                    gap: 15px;
+                    align-items: flex-end;
+                }}
+                .col-kwan {{
+                    writing-mode: vertical-rl;
+                    font-size: {sz_kwan}px;
+                    letter-spacing: 4px;
+                }}
+                .col-lower {{
+                    writing-mode: vertical-rl;
+                    font-size: {sz_lower}px;
+                    letter-spacing: 4px;
+                }}
+                @media print {{
+                    body * {{ visibility: hidden; }}
+                    .a4-page, .a4-page * {{ visibility: visible; }}
+                    .a4-page {{ position: absolute; left: 0; top: 0; border: none; box-shadow: none; width: 210mm; height: 297mm; }}
+                }}
+                </style>
+                <div class="a4-page">
+                    <div class="col-left-group">
+                        <div class="col-kwan"><span>{kwan_text}</span></div>
+                        <div class="col-lower"><span>{sender_extra}</span></div>
+                        <div class="col-lower"><span>{sender_name}</span></div>
+                        <div class="col-lower"><span>{sender_company}</span></div>
+                    </div>
+                    <div class="col-center">
+                        <span>{mid_text}</span>
+                    </div>
+                    <div class="col-right">
+                        <span>{upper_text}</span>
+                    </div>
                 </div>
-                <div class="col-center">
-                    <span>{mid_text}</span>
+                """
+      else:  # 橫式排版 (上 -> 中 -> 下)
+        a4_html = f"""
+                <style>
+                .a4-page-h {{
+                    width: 210mm;
+                    height: 297mm;
+                    padding: 25mm 20mm;
+                    margin: auto;
+                    border: 2px dashed #bbb;
+                    background: white;
+                    font-family: "DFKai-SB", "BiauKai", "標楷體", "KaiTi", serif;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+                    align-items: center;
+                    box-sizing: border-box;
+                    box-shadow: 0 0 15px rgba(0,0,0,0.1);
+                    color: #000;
+                    text-align: center;
+                }}
+                .row-upper {{
+                    font-size: {sz_upper}px;
+                    letter-spacing: 4px;
+                }}
+                .row-center {{
+                    font-size: {sz_mid}px;
+                    font-weight: bold;
+                    letter-spacing: 8px;
+                }}
+                .row-lower {{
+                    font-size: {sz_lower}px;
+                    letter-spacing: 4px;
+                    display: flex;
+                    gap: 15px;
+                    justify-content: center;
+                    align-items: center;
+                }}
+                @media print {{
+                    body * {{ visibility: hidden; }}
+                    .a4-page-h, .a4-page-h * {{ visibility: visible; }}
+                    .a4-page-h {{ position: absolute; left: 0; top: 0; border: none; box-shadow: none; width: 210mm; height: 297mm; }}
+                }}
+                </style>
+                <div class="a4-page-h">
+                    <div class="row-upper"><span>{upper_text}</span></div>
+                    <div class="row-center"><span>{mid_text}</span></div>
+                    <div class="row-lower">
+                        <span>{sender_company}</span>
+                        <span>{sender_name}</span>
+                        <span>{sender_extra}</span>
+                        <span style="font-size: {sz_kwan}px;">{kwan_text}</span>
+                    </div>
                 </div>
-                <div class="col-right">
-                    <span>{upper_text}</span>
-                </div>
-            </div>
-            """
-      st.markdown(a4_mourning_html, unsafe_allow_html=True)
+                """
+
+      st.markdown(a4_html, unsafe_allow_html=True)
 
     else:
       st.markdown("### 🌸 喜慶 / 開幕賀卡設定")
@@ -522,5 +594,5 @@ else:
       st.markdown(a4_joy_html, unsafe_allow_html=True)
 
     st.info(
-        "💡 提示：按下 **Ctrl + P** 列印，將紙張大小設定為 **A4**、方向設為「直向」，即可完美列印！"
+        "💡 提示：按下 **Ctrl + P** 列印，將紙張大小設定為 **A4**、方向選擇直式或橫式，即可完美印出！"
     )
